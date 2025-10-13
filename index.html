@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- PWA / icons -->
+  <!-- PWA / icons（そのまま利用可） -->
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#1556d1">
   <link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
@@ -96,7 +96,6 @@
         <div id="done" class="msg msg-ok done" role="status" aria-live="assertive">
           <h2>✅ アップロードが完了しました（成功）</h2>
           <p class="sub" id="doneCount"></p>
-          <p class="sub" id="errBox" style="color:#a12121;margin-top:6px;display:none"></p>
         </div>
       </form>
     </div>
@@ -114,11 +113,8 @@
   </div>
 
   <script>
-    /* ==== 設定（★必ず置き換え） ==== */
-    // 新しくデプロイした GAS の /exec URL を貼る。?api= で一時上書きも可
+    /* ==== API のURLだけあなたの /exec に差し替え ==== */
     let API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbysxr03ePCQtiggBBXurqjsUORK6-nBwmw0c-QPj7l28DvVb6GTZc0SqOKq7Q48Lx4M/exec';
-    const q = new URLSearchParams(location.search).get('api');
-    if (q) API_ENDPOINT = q;
 
     const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
     const MAX_BYTES  = 25*1024*1024;
@@ -127,9 +123,8 @@
     const pickInput=$('#pick'), cameraFile=$('#cameraFile');
     const thumbs=$('#thumbs'), precheck=$('#precheck');
     const sendBtn=$('#sendBtn'), sending=$('#sending');
-    const doneBox=$('#done'), doneCount=$('#doneCount'), errBox=$('#errBox');
+    const doneBox=$('#done'), doneCount=$('#doneCount');
 
-    // カメラ
     const camModal=$('#camModal'), camVideo=$('#camVideo');
     const camClose=$('#camClose'), camShot=$('#camShot');
     let camStream=null;
@@ -200,47 +195,43 @@
       sendBtn.disabled=false;
     }
 
+    // 送信（成功数だけ表示 / エラー詳細は出さない）
     document.getElementById('f').addEventListener('submit',(e)=>{
       e.preventDefault(); if(!queue.length) return;
       (async ()=>{
-        sendBtn.disabled=true; sending.style.display='block';
+        sendBtn.disabled=true;
+        sending.style.display='block';
+        // ↓↓↓ 押したら自動で“アップロード中”までスクロール
+        setTimeout(()=>{ sending.scrollIntoView({behavior:'smooth', block:'start'}); }, 30);
+
         const note = document.getElementById('note').value || '';
-        let okCount=0, maybeCount=0; const errs=[];
+        let okCount=0;
 
         for (const f of queue){
-          const packed = await toBase64WithOptionalResize(f);
-          if (packed.bytes > MAX_BYTES){ alert(`${f.name} が上限を超えます。`); sending.style.display='none'; sendBtn.disabled=false; return; }
-
-          const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
-          const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
-
-          let success=false;
           try{
-            const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) });
-            let data;
-            const ct = (resp.headers.get('content-type')||'').toLowerCase();
-            if (ct.includes('application/json')) data = await resp.json();
-            else { const t=await resp.text(); throw new Error('NON_JSON_RESPONSE: '+t.slice(0,200)); }
+            const packed = await toBase64WithOptionalResize(f);
+            if (packed.bytes > MAX_BYTES){ continue; } // 超過は黙ってスキップ
 
-            if (!resp.ok || !data?.ok) throw new Error(data?.error || ('HTTP_'+resp.status));
-            success=true; okCount += data.count||0;
-          }catch(err){ console.error('UPLOAD_ERROR:', err); errs.push(String(err.message||err)); }
-          if(!success) maybeCount++;
+            const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
+            const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
+
+            const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) });
+            const ct = (resp.headers.get('content-type')||'').toLowerCase();
+            const data = ct.includes('application/json') ? await resp.json() : null;
+            if (resp.ok && data && data.ok){
+              okCount += data.count || 0;
+            }
+          }catch(_){ /* エラーは表示しない */ }
         }
 
         sending.style.display='none';
         doneBox.classList.add('show');
-        const total=okCount+maybeCount;
-        doneCount.innerHTML=(maybeCount===0)
-          ? `送信されたファイル数：<strong>${okCount}</strong>`
-          : `送信された可能性のあるファイル数：<strong>${total}</strong>（回線や権限の都合で結果確認ができませんでした）`;
-        if (errs.length){ errBox.style.display='block'; errBox.textContent='エラー詳細: '+errs.join(' / '); } else { errBox.style.display='none'; }
-
+        doneCount.innerHTML = `送信されたファイル数：<strong>${okCount}</strong>`;
         queue.length=0; render();
       })();
     });
 
-    // 画像は 2000px に縮小、非画像はそのまま base64
+    // 画像は 2000px に縮小
     async function toBase64WithOptionalResize(file){
       if((file.type||'').startsWith('image/')){
         const dataUrl=await readFileAsDataURL(file);
@@ -267,4 +258,3 @@
   </script>
 </body>
 </html>
-
