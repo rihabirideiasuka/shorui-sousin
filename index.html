@@ -4,32 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- PWA / アイコン（icons/ と manifest.webmanifest を同リポジトリに配置） -->
+  <!-- PWA / icons -->
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#1556d1">
-  
-  <!-- Favicon -->
   <link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
   <link rel="icon" href="./icons/favicon-16.png" sizes="16x16">
-  
-  <!-- PWA / iOS -->
   <link rel="icon" href="./icons/icon-192.png" sizes="192x192">
   <link rel="icon" href="./icons/icon-512.png" sizes="512x512">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png">
-  
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
 
   <title>書類アップロード</title>
   <style>
     *,*::before,*::after{box-sizing:border-box}
-    :root{
-      --primary:#1556d1;   /* 青：アルバム */
-      --accent:#0b8a3b;    /* 緑：カメラ */
-      --danger:#c62828;
-      --ok:#137333;
-      --fg:#111; --muted:#666; --bg:#f6f7fb; --card:#fff;
-    }
+    :root{--primary:#1556d1;--accent:#0b8a3b;--danger:#c62828;--ok:#137333;--fg:#111;--muted:#666;--bg:#f6f7fb;--card:#fff}
     html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans JP',sans-serif;line-height:1.6;margin:0}
     .wrap{max-width:880px;margin:0 auto;padding:20px}
     .card{background:var(--card);border-radius:18px;box-shadow:0 2px 14px rgba(0,0,0,.06);padding:20px}
@@ -41,15 +30,14 @@
     .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease}
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--primary);color:#fff}
-    .btn-accent {background:var(--accent); color:#fff}   /* ← カメラもソリッドで同格に */
+    .btn-accent{background:var(--accent);color:#fff}
     .btn-danger{background:#ef5753;color:#fff}
-    .btn-ghost {background:#eef3ff;color:#183a9b}
     .btn[disabled]{opacity:.6;cursor:not-allowed}
 
     .hint{font-size:14px;color:var(--muted);margin:6px 0 0}
     .msg{padding:12px 14px;border-radius:12px;margin:10px 0;font-size:16px}
     .msg-ok{background:#e9f5ee;color:var(--ok);border:1px solid #bfe5cd}
-    .msg-bad{background:#fdecec;color:#a12121;border:1px solid #f3c3c0}
+    .msg-bad{background:#fdecec;color:var(--danger);border:1px solid #f3c3c0}
     .msg-info{background:#eef3ff;color:#274291;border:1px solid #cfdcff}
 
     .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:10px}
@@ -67,12 +55,11 @@
     .done.show{display:block}
     .done h2{margin:0 0 6px;font-size:22px}
     .done .sub{margin:0;color:#333}
-    .big{font-size:18px}
 
-    /* カメラ：全画面＆下固定ボタン（上バナーでも隠れにくい） */
+    /* カメラ：全画面＆下固定ボタン */
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:0;z-index:9999}
     .modal.show{display:flex}
-    .cam{background:#000;width:100%;max-width:1000px;border-radius:0;color:#fff;display:flex;flex-direction:column;height:100svh}
+    .cam{background:#000;width:100%;max-width:1000px;color:#fff;display:flex;flex-direction:column;height:100svh}
     .cam video{flex:1 1 auto;width:100%;height:auto;object-fit:cover}
     .cam .controls{display:flex;gap:12px;justify-content:space-between;padding:16px;background:rgba(0,0,0,.65)}
     .cam .btn{flex:1;font-size:18px;padding:16px;border-radius:12px}
@@ -87,16 +74,16 @@
       <h1>書類アップロード</h1>
 
       <form id="f" autocomplete="off" novalidate>
-        <label class="big">利用者名・CM名 等（任意）</label>
+        <label>利用者名・CM名 等（任意）</label>
         <input type="text" id="note" placeholder="例）山田 太郎／CM名／事業所名 など">
 
-        <label class="big">写真・PDF</label>
+        <label>写真・PDF</label>
         <div class="btns">
-          <!-- アルバムから選ぶ（複数） -->
+          <!-- アルバム（複数） -->
           <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
           <button type="button" class="btn btn-primary" id="pickBtn">📁 アルバムから写真を選択して送る</button>
 
-          <!-- カメラ撮影（1枚ずつ・内蔵UI） / フォールバックの file input  -->
+          <!-- カメラ（1枚ずつ）／フォールバック -->
           <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
           <button type="button" class="btn btn-accent" id="camBtn">📸 写真を撮影して送る（1枚ずつ）</button>
 
@@ -109,25 +96,24 @@
         <div class="thumbs" id="thumbs" aria-live="polite"></div>
 
         <div class="btns" style="margin-top:14px">
-          <button class="btn btn-primary big" id="sendBtn" type="submit" disabled>⬆ 送信する</button>
+          <button class="btn btn-primary" id="sendBtn" type="submit" disabled>⬆ 送信する</button>
         </div>
 
-        <!-- 送信中 -->
         <div id="sending" class="msg msg-info" style="display:none" role="status" aria-live="assertive">
           ⏳ アップロード中です。画面を閉じないでください。
           <div class="progress"><div class="bar"></div></div>
         </div>
 
-        <!-- 完了（成功） -->
         <div id="done" class="msg msg-ok done" role="status" aria-live="assertive">
           <h2>✅ アップロードが完了しました（成功）</h2>
           <p class="sub" id="doneCount"></p>
+          <p class="sub" id="errBox" style="color:#a12121;margin-top:6px;display:none"></p>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- カメラ用モーダル -->
+  <!-- カメラモーダル -->
   <div id="camModal" class="modal" aria-hidden="true">
     <div class="cam" role="dialog" aria-label="カメラで撮影">
       <video id="camVideo" autoplay playsinline></video>
@@ -139,41 +125,34 @@
   </div>
 
   <script>
-    /* ================== 設定：ここだけ変更 ================== */
-    // ↓ 自分の GAS Webアプリ（/exec）のURLに置き換えてください
-    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxNZdT3WC_46aiYlJN0y2LgWTDgb6Fs8zexE-N6PdRrp0LgZNLiTPjfuxSHgpyrt8Tv/exec';
+    /* ===== 設定：ここを自分の /exec に差し替える =====
+       例: const API_ENDPOINT = 'https://script.google.com/macros/s/xxxxxxxx/exec';
+       ?api=URL で上書きできる（デバッグ用）                          */
+    let API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxJqXP_tjVPso3ZllPEymOceZlCmnjooPKvs41yavMSVaUxUDxAByZj2ycwDKNONB5E/exec';
+    const q = new URLSearchParams(location.search).get('api');
+    if (q) API_ENDPOINT = q;
+
     const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
     const MAX_BYTES  = 25*1024*1024;
-    /* ======================================================= */
 
     const queue=[]; const $=s=>document.querySelector(s);
     const pickInput=$('#pick'), cameraFile=$('#cameraFile');
     const thumbs=$('#thumbs'), precheck=$('#precheck');
     const sendBtn=$('#sendBtn'), sending=$('#sending');
-    const doneBox=$('#done'), doneCount=$('#doneCount');
+    const doneBox=$('#done'), doneCount=$('#doneCount'), errBox=$('#errBox');
 
     // カメラ
     const camModal=$('#camModal'), camVideo=$('#camVideo');
     const camClose=$('#camClose'), camShot=$('#camShot');
     let camStream=null;
 
-    // 追加ボタン
     $('#pickBtn').onclick=()=>pickInput.click();
     $('#camBtn').onclick =()=>openCameraOrFallback();
     $('#clearBtn').onclick=()=>{queue.length=0;render();};
 
-    // アルバム選択
-    pickInput.addEventListener('change',e=>{
-      for(const f of e.target.files) queue.push(f);
-      e.target.value=''; render();
-    });
-    // フォールバックのカメラ（file input）
-    cameraFile.addEventListener('change',e=>{
-      if(e.target.files[0]) queue.push(e.target.files[0]);
-      e.target.value=''; render();
-    });
+    pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
+    cameraFile.addEventListener('change',e=>{ if(e.target.files[0]) queue.push(e.target.files[0]); e.target.value=''; render(); });
 
-    // ---- カメラ（getUserMedia） ----
     async function openCameraOrFallback(){
       if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
       try{
@@ -194,18 +173,15 @@
       const w=s.width||camVideo.videoWidth||1280, h=s.height||camVideo.videoHeight||720;
       const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(camVideo,0,0,w,h);
       const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
-      const name=(()=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`})();
+      const d=new Date(), z=n=>String(n).padStart(2,'0');
+      const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
       queue.push(new File([blob],name,{type:'image/jpeg'})); stopCamera(); render();
     };
 
-    // ---- 表示更新 & 事前チェック ----
     function render(){
       thumbs.innerHTML='';
       if(queue.length>0) doneBox.classList.remove('show');
-      if(!queue.length){
-        precheck.className='msg msg-info'; precheck.textContent='選択されたファイルはありません。';
-        sendBtn.disabled=true; return;
-      }
+      if(!queue.length){ precheck.className='msg msg-info'; precheck.textContent='選択されたファイルはありません。'; sendBtn.disabled=true; return; }
 
       queue.forEach((f,i)=>{
         const card=document.createElement('div'); card.className='thumb';
@@ -221,16 +197,14 @@
       document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
 
       if(queue.some(f=>!ALLOW_MIME.includes((f.type||'').toLowerCase()))){
-        precheck.className='msg msg-bad'; precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。';
-        sendBtn.disabled=true; return;
+        precheck.className='msg msg-bad'; precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。'; sendBtn.disabled=true; return;
       }
       const overs=queue.filter(f=>f.size>MAX_BYTES);
       if(overs.length){
         precheck.className='msg msg-bad';
         precheck.innerHTML=`⚠ 上限<strong>${Math.round(MAX_BYTES/1024/1024)}MB</strong>を超えています：<br>${
           overs.map(f=>`${escapeHtml(f.name)}（${(f.size/1024/1024).toFixed(1)}MB）`).join('、 ')
-        }`;
-        sendBtn.disabled=true; return;
+        }`; sendBtn.disabled=true; return;
       }
       const sum=queue.reduce((s,f)=>s+f.size,0);
       precheck.className='msg msg-ok';
@@ -238,62 +212,35 @@
       sendBtn.disabled=false;
     }
 
-    // ---- 送信：1ファイルずつ / リトライ付 ----
     document.getElementById('f').addEventListener('submit',(e)=>{
       e.preventDefault(); if(!queue.length) return;
       (async ()=>{
         sendBtn.disabled=true; sending.style.display='block';
         const note = document.getElementById('note').value || '';
-        let okCount=0, maybeCount=0;
+        let okCount=0, maybeCount=0; const errs=[];
 
-        for (const f of queue) {
+        for (const f of queue){
           const packed = await toBase64WithOptionalResize(f);
-          if (packed.bytes > MAX_BYTES) {
-            sending.style.display = 'none';
-            alert(`${f.name} が上限を超えます。`);
-            sendBtn.disabled = false;
-            return;
-          }
-        
-          const payload = { note, items: [{ name: f.name, mime: packed.mime, base64: packed.base64 }] };
+          if (packed.bytes > MAX_BYTES){ alert(`${f.name} が上限を超えます。`); sending.style.display='none'; sendBtn.disabled=false; return; }
+
+          const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
           const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
-        
-          let success = false;
-          try {
-            const resp = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain' }, // プリフライト回避
-              body: JSON.stringify(payload)
-            });
-        
-            // ---- ここが「B) エラー内容を確認できるように」の肝 ----
+
+          let success=false;
+          try{
+            const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) });
             let data;
-            const ct = resp.headers.get('content-type') || '';
-            if (ct.includes('application/json')) {
-              data = await resp.json();
-            } else {
-              const text = await resp.text();
-              // ログインHTMLやエラーページが返ってくる場合の可視化
-              console.error('NON_JSON_RESPONSE:', text.substring(0, 400));
-              throw new Error('NON_JSON_RESPONSE: ' + text.substring(0, 200));
-            }
-        
-            if (!resp.ok || !data?.ok) {
-              throw new Error(data?.error || ('UPLOAD_FAILED_HTTP_' + resp.status));
-            }
-        
-            // 成功
-            success = true;
-            okCount += data.count || 0;
-        
-          } catch (err) {
+            const ct = resp.headers.get('content-type')||'';
+            if (ct.includes('application/json')) data = await resp.json();
+            else { const t=await resp.text(); throw new Error('NON_JSON_RESPONSE: '+t.slice(0,200)); }
+
+            if (!resp.ok || !data?.ok) throw new Error(data?.error || ('HTTP_'+resp.status));
+            success=true; okCount += data.count||0;
+          }catch(err){
             console.error('UPLOAD_ERROR:', err);
-            // ここで「毎回 可能性…」に落ちている原因がコンソールに出ます
+            errs.push(String(err.message||err));
           }
-        
-          if (!success) {
-            maybeCount++;
-          }
+          if(!success) maybeCount++;
         }
 
         sending.style.display='none';
@@ -301,23 +248,26 @@
         const total = okCount + maybeCount;
         doneCount.innerHTML = (maybeCount===0)
           ? `送信されたファイル数：<strong>${okCount}</strong>`
-          : `送信された可能性のあるファイル数：<strong>${total}</strong>（回線の都合で結果確認ができませんでした）`;
+          : `送信された可能性のあるファイル数：<strong>${total}</strong>（回線や権限の都合で結果確認ができませんでした）`;
+
+        if (errs.length){ errBox.style.display='block'; errBox.textContent = 'エラー詳細: ' + errs.join(' / '); }
+        else { errBox.style.display='none'; }
+
         queue.length=0; render();
       })();
     });
 
-    // 画像は最大2000pxへ縮小。非画像はそのままBase64化
     async function toBase64WithOptionalResize(file){
       if((file.type||'').startsWith('image/')){
-        const dataUrl = await readFileAsDataURL(file);
-        const img = await loadImage(dataUrl);
+        const dataUrl=await readFileAsDataURL(file);
+        const img=await loadImage(dataUrl);
         const maxW=2000,maxH=2000, scale=Math.min(1,maxW/img.width,maxH/img.height);
         let outUrl=dataUrl, mimeOut=(file.type==='image/png'?'image/png':'image/jpeg');
         if(scale<1){
           const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
           c.getContext('2d').drawImage(img,0,0,c.width,c.height);
           outUrl=c.toDataURL(mimeOut,0.9);
-        }else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
+        } else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
         const base64=outUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
         return { base64, bytes, mime:mimeOut };
       }else{
@@ -333,11 +283,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
