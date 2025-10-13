@@ -25,7 +25,6 @@
     h1{font-size:22px;margin:0 0 8px}
     label{display:block;font-weight:600;margin:14px 0 6px}
     input[type="text"]{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:14px;font-size:16px}
-
     .btns{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
     .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease}
     .btn:active{transform:translateY(1px)}
@@ -33,39 +32,31 @@
     .btn-accent{background:var(--accent);color:#fff}
     .btn-danger{background:#ef5753;color:#fff}
     .btn[disabled]{opacity:.6;cursor:not-allowed}
-
-    .hint{font-size:14px;color:var(--muted);margin:6px 0 0}
+    .hint{font-size:14px;color:var(--muted);margin:6px 0}
     .msg{padding:12px 14px;border-radius:12px;margin:10px 0;font-size:16px}
     .msg-ok{background:#e9f5ee;color:var(--ok);border:1px solid #bfe5cd}
     .msg-bad{background:#fdecec;color:var(--danger);border:1px solid #f3c3c0}
     .msg-info{background:#eef3ff;color:#274291;border:1px solid #cfdcff}
-
     .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:10px}
     .thumb{background:#fafafa;border:1px solid #eee;border-radius:14px;overflow:hidden}
     .thumb img{width:100%;height:120px;object-fit:cover;display:block;background:#fff}
     .thumb .meta{padding:8px 10px;font-size:14px}
     .thumb .row{display:flex;justify-content:space-between;gap:8px;align-items:center}
     .remove{background:#ffe7e7;color:#a12121;border:0;border-radius:10px;padding:6px 8px;font-weight:700;cursor:pointer}
-
     .progress{height:10px;background:#e8eefc;border-radius:999px;overflow:hidden;margin:10px 0 0}
     .bar{width:40%;height:100%;background:var(--primary);animation:indef 1.2s infinite}
     @keyframes indef{0%{transform:translateX(-60%)}100%{transform:translateX(160%)}}
+    .done{display:none;margin-top:14px}.done.show{display:block}
+    .done h2{margin:0 0 6px;font-size:22px}.done .sub{margin:0;color:#333}
 
-    .done{display:none;margin-top:14px}
-    .done.show{display:block}
-    .done h2{margin:0 0 6px;font-size:22px}
-    .done .sub{margin:0;color:#333}
-
-    /* カメラ：全画面＆下固定ボタン */
+    /* カメラ全画面 */
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:0;z-index:9999}
     .modal.show{display:flex}
     .cam{background:#000;width:100%;max-width:1000px;color:#fff;display:flex;flex-direction:column;height:100svh}
     .cam video{flex:1 1 auto;width:100%;height:auto;object-fit:cover}
     .cam .controls{display:flex;gap:12px;justify-content:space-between;padding:16px;background:rgba(0,0,0,.65)}
     .cam .btn{flex:1;font-size:18px;padding:16px;border-radius:12px}
-    @supports (padding: env(safe-area-inset-bottom)){
-      .cam .controls{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
-    }
+    @supports (padding: env(safe-area-inset-bottom)){ .cam .controls{padding-bottom:calc(16px + env(safe-area-inset-bottom))} }
   </style>
 </head>
 <body>
@@ -75,15 +66,13 @@
 
       <form id="f" autocomplete="off" novalidate>
         <label>利用者名・CM名 等（任意）</label>
-        <input type="text" id="note" placeholder="例）山田 太郎／CM名／事業所名 など">
+        <input type="text" id="note" placeholder="例）山田 太郎／CM名／事業所名 など" />
 
         <label>写真・PDF</label>
         <div class="btns">
-          <!-- アルバム（複数） -->
           <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
           <button type="button" class="btn btn-primary" id="pickBtn">📁 アルバムから写真を選択して送る</button>
 
-          <!-- カメラ（1枚ずつ）／フォールバック -->
           <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
           <button type="button" class="btn btn-accent" id="camBtn">📸 写真を撮影して送る（1枚ずつ）</button>
 
@@ -125,10 +114,9 @@
   </div>
 
   <script>
-    /* ===== 設定：ここを自分の /exec に差し替える =====
-       例: const API_ENDPOINT = 'https://script.google.com/macros/s/xxxxxxxx/exec';
-       ?api=URL で上書きできる（デバッグ用）                          */
-    let API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxJqXP_tjVPso3ZllPEymOceZlCmnjooPKvs41yavMSVaUxUDxAByZj2ycwDKNONB5E/exec';
+    /* ==== 設定（★必ず置き換え） ==== */
+    // 新しくデプロイした GAS の /exec URL を貼る。?api= で一時上書きも可
+    let API_ENDPOINT = 'PASTE_YOUR_EXEC_URL_HERE';
     const q = new URLSearchParams(location.search).get('api');
     if (q) API_ENDPOINT = q;
 
@@ -230,33 +218,29 @@
           try{
             const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) });
             let data;
-            const ct = resp.headers.get('content-type')||'';
+            const ct = (resp.headers.get('content-type')||'').toLowerCase();
             if (ct.includes('application/json')) data = await resp.json();
             else { const t=await resp.text(); throw new Error('NON_JSON_RESPONSE: '+t.slice(0,200)); }
 
             if (!resp.ok || !data?.ok) throw new Error(data?.error || ('HTTP_'+resp.status));
             success=true; okCount += data.count||0;
-          }catch(err){
-            console.error('UPLOAD_ERROR:', err);
-            errs.push(String(err.message||err));
-          }
+          }catch(err){ console.error('UPLOAD_ERROR:', err); errs.push(String(err.message||err)); }
           if(!success) maybeCount++;
         }
 
         sending.style.display='none';
         doneBox.classList.add('show');
-        const total = okCount + maybeCount;
-        doneCount.innerHTML = (maybeCount===0)
+        const total=okCount+maybeCount;
+        doneCount.innerHTML=(maybeCount===0)
           ? `送信されたファイル数：<strong>${okCount}</strong>`
           : `送信された可能性のあるファイル数：<strong>${total}</strong>（回線や権限の都合で結果確認ができませんでした）`;
-
-        if (errs.length){ errBox.style.display='block'; errBox.textContent = 'エラー詳細: ' + errs.join(' / '); }
-        else { errBox.style.display='none'; }
+        if (errs.length){ errBox.style.display='block'; errBox.textContent='エラー詳細: '+errs.join(' / '); } else { errBox.style.display='none'; }
 
         queue.length=0; render();
       })();
     });
 
+    // 画像は 2000px に縮小、非画像はそのまま base64
     async function toBase64WithOptionalResize(file){
       if((file.type||'').startsWith('image/')){
         const dataUrl=await readFileAsDataURL(file);
@@ -267,7 +251,7 @@
           const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
           c.getContext('2d').drawImage(img,0,0,c.width,c.height);
           outUrl=c.toDataURL(mimeOut,0.9);
-        } else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
+        }else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
         const base64=outUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
         return { base64, bytes, mime:mimeOut };
       }else{
