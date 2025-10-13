@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- PWA / icons（任意。既に設置済みならそのままでOK） -->
+  <!-- PWA / icons（任意） -->
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#1556d1">
   <link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
@@ -26,17 +26,23 @@
     label{display:block;font-weight:600;margin:14px 0 6px}
     input[type="text"]{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:14px;font-size:16px}
 
-    .btns{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+    /* ===== ボタン ===== */
     .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease}
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--primary);color:#fff}
     .btn-danger{background:var(--danger);color:#fff}
     .btn[disabled]{opacity:.6;cursor:not-allowed}
 
+    /* 2つの青ボタンを等幅に */
+    .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+    .btn-bar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+
     .hint{font-size:14px;color:var(--muted);margin:6px 0}
+    .mini{font-size:12px;color:var(--muted);margin-top:4px}
+
     .msg{padding:12px 14px;border-radius:12px;margin:10px 0;font-size:16px}
     .msg-ok{background:#e9f5ee;color:var(--ok);border:1px solid #bfe5cd}
-    .msg-bad{background:#fdecec;color:var(--danger);border:1px solid #f3c3c0}
+    .msg-bad{background:#fdecec;color:#a12121;border:1px solid #f3c3c0}
     .msg-info{background:#eef3ff;color:#274291;border:1px solid #cfdcff}
 
     .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:10px}
@@ -50,19 +56,22 @@
     .bar{width:40%;height:100%;background:var(--primary);animation:indef 1.2s infinite}
     @keyframes indef{0%{transform:translateX(-60%)}100%{transform:translateX(160%)}}
 
-    .done{display:none;margin-top:14px}
-    .done.show{display:block}
+    .done{display:none;margin-top:14px}.done.show{display:block}
     .done h2{margin:0 0 6px;font-size:22px}
-    .big{font-size:18px}
 
-    /* カメラ全画面（必要なら活かす） */
+    /* ===== カメラ全画面＆連続撮影 ===== */
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:0;z-index:9999}
     .modal.show{display:flex}
     .cam{background:#000;width:100%;max-width:1000px;color:#fff;display:flex;flex-direction:column;height:100svh}
     .cam video{flex:1 1 auto;width:100%;height:auto;object-fit:cover}
-    .cam .controls{display:flex;gap:12px;justify-content:space-between;padding:16px;background:rgba(0,0,0,.65)}
-    .cam .btn{flex:1;font-size:18px;padding:16px;border-radius:12px}
-    @supports (padding: env(safe-area-inset-bottom)){ .cam .controls{padding-bottom:calc(16px + env(safe-area-inset-bottom))} }
+    .cam .controls{display:flex;gap:10px;justify-content:space-between;padding:12px;background:rgba(0,0,0,.6)}
+    .cam .btn{flex:1;padding:14px;border-radius:12px}
+
+    /* トースト（追加アピール） */
+    .toast{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#e9f5ee;color:#0b6e3f;border:1px solid #bfe5cd;
+           padding:10px 14px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:10000;display:none}
+    .toast.show{display:block;animation:fade 2.4s ease forwards}
+    @keyframes fade{0%{opacity:0;transform:translate(-50%,-6px)}10%{opacity:1;transform:translate(-50%,0)}90%{opacity:1}100%{opacity:0}}
   </style>
 </head>
 <body>
@@ -75,13 +84,19 @@
         <input type="text" id="note" placeholder="例）山田 太郎／CM名／事業所名 など" />
 
         <label>写真・PDF</label>
-        <div class="btns">
-          <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
+
+        <!-- 等幅の2ボタン -->
+        <div class="btn-row">
           <button type="button" class="btn btn-primary" id="pickBtn">📁 アルバムから写真を選択して送る</button>
+          <button type="button" class="btn btn-primary" id="camBtn">📸 写真を撮影して送る</button>
+        </div>
+        <div class="mini">※ カメラは「撮影して追加」後も続けて撮影できます</div>
 
-          <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
-          <button type="button" class="btn btn-primary" id="camBtn">📸 写真を撮影して送る（1枚ずつ）</button>
+        <!-- ファイル input は隠す -->
+        <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
+        <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
 
+        <div class="btn-bar">
           <button type="button" class="btn btn-danger" id="clearBtn">✖ すべて削除</button>
         </div>
 
@@ -90,17 +105,15 @@
         <div id="precheck" class="msg msg-info" role="status" aria-live="polite">選択されたファイルはありません。</div>
         <div class="thumbs" id="thumbs" aria-live="polite"></div>
 
-        <div class="btns" style="margin-top:14px">
+        <div class="btn-bar" style="margin-top:14px">
           <button class="btn btn-primary" id="sendBtn" type="submit" disabled>⬆ 送信する</button>
         </div>
 
-        <!-- 送信中 -->
         <div id="sending" class="msg msg-info" style="display:none" role="status" aria-live="assertive">
           ⏳ アップロード中です。画面を閉じないでください。
           <div class="progress"><div class="bar"></div></div>
         </div>
 
-        <!-- 完了（件数表示なし） -->
         <div id="done" class="msg msg-ok done" role="status" aria-live="assertive">
           <h2>✅ アップロードが完了しました（成功）</h2>
         </div>
@@ -108,21 +121,24 @@
     </div>
   </div>
 
-  <!-- （任意）カメラモーダル：使うならUI活かせます -->
+  <!-- カメラモーダル（連続撮影OK） -->
   <div id="camModal" class="modal" aria-hidden="true">
     <div class="cam" role="dialog" aria-label="カメラで撮影">
       <video id="camVideo" autoplay playsinline></video>
       <div class="controls">
-        <button type="button" class="btn" id="camClose">閉じる</button>
-        <button type="button" class="btn btn-primary" id="camShot">撮影する</button>
+        <button type="button" class="btn" id="camClose">完了して閉じる</button>
+        <button type="button" class="btn btn-primary" id="camShot">撮影して追加</button>
       </div>
     </div>
   </div>
 
+  <!-- 追加アピール用トースト -->
+  <div id="toast" class="toast">✅ 追加しました</div>
+
   <script>
-    /* ====== あなたの GAS /exec URL に変更 ====== */
+    /* ==== あなたの GAS /exec に変更 ==== */
     const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxWoLIuxw0pO9sJepiUn2TTRbZYV_cKvov6V4goKnvalTCynvJ17sepLxHKpSGKOJ9L/exec';
-    /* =========================================== */
+    /* ================================== */
 
     const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
     const MAX_BYTES  = 25*1024*1024;
@@ -132,16 +148,61 @@
     const thumbs=$('#thumbs'), precheck=$('#precheck');
     const sendBtn=$('#sendBtn'), sending=$('#sending');
     const doneBox=$('#done');
+    const toast=$('#toast');
 
-    // ボタン
+    // カメラ
+    const camModal=$('#camModal'), camVideo=$('#camVideo');
+    const camClose=$('#camClose'), camShot=$('#camShot');
+    let camStream=null, camAdded=0;
+
+    // 追加ボタン
     $('#pickBtn').onclick=()=>pickInput.click();
-    $('#camBtn').onclick =()=>cameraFile.click(); // シンプル版：フォールバックを直接使用
+    $('#camBtn').onclick =()=>openCameraOrFallback();
     $('#clearBtn').onclick=()=>{queue.length=0;render();};
 
-    // 選択
+    // 選択イベント
     pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
     cameraFile.addEventListener('change',e=>{ if(e.target.files[0]) queue.push(e.target.files[0]); e.target.value=''; render(); });
 
+    // ===== カメラ（getUserMedia） =====
+    async function openCameraOrFallback(){
+      if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
+      try{
+        camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'} }, audio:false });
+        camVideo.srcObject=camStream; camModal.classList.add('show'); camModal.setAttribute('aria-hidden','false');
+        document.body.style.overflow='hidden';
+        camAdded=0;
+      }catch(e){ cameraFile.click(); }
+    }
+    function stopCamera(){
+      if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+      camVideo.srcObject=null; camModal.classList.remove('show'); camModal.setAttribute('aria-hidden','true');
+      document.body.style.overflow='';
+    }
+    camClose.onclick=()=>{ stopCamera(); render(); };
+
+    // 連続撮影：閉じずに queue に追加 & トースト表示
+    camShot.onclick=async ()=>{
+      if(!camStream) return;
+      const track=camStream.getVideoTracks()[0], s=track.getSettings?track.getSettings():{};
+      const w=s.width||camVideo.videoWidth||1280, h=s.height||camVideo.videoHeight||720;
+      const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(camVideo,0,0,w,h);
+      const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
+      const d=new Date(), z=n=>String(n).padStart(2,'0');
+      const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
+      queue.push(new File([blob],name,{type:'image/jpeg'}));
+      camAdded++;
+      showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
+    };
+
+    function showToast(msg){
+      toast.textContent=msg;
+      toast.classList.remove('show');
+      // 次フレームで付け直し（再生させる）
+      requestAnimationFrame(()=>{ toast.classList.add('show'); });
+    }
+
+    // ===== 画面更新 =====
     function render(){
       thumbs.innerHTML='';
       if(queue.length>0) doneBox.classList.remove('show');
@@ -160,6 +221,9 @@
       });
       document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
 
+      // 事前チェック
+      const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
+      const MAX_BYTES = 25*1024*1024;
       if(queue.some(f=>!ALLOW_MIME.includes((f.type||'').toLowerCase()))){
         precheck.className='msg msg-bad'; precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。'; sendBtn.disabled=true; return;
       }
@@ -176,7 +240,7 @@
       sendBtn.disabled=false;
     }
 
-    // 送信（成功/失敗は判定しない＝常に「成功しました」だけ表示）
+    // ===== 送信（件数は表示しない） =====
     document.getElementById('f').addEventListener('submit',(e)=>{
       e.preventDefault(); if(!queue.length) return;
       (async ()=>{
@@ -194,12 +258,11 @@
             const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
             const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
 
-            // ここがポイント：no-cors で送る（レスポンスは読まない）
             await fetch(url, {
               method:'POST',
               headers:{'Content-Type':'text/plain'},
               body:JSON.stringify(payload),
-              mode:'no-cors'
+              mode:'no-cors' // 成功/失敗に関わらず完了表示する簡潔版
             });
           }catch(_){ /* 失敗しても黙る */ }
         }
@@ -234,6 +297,8 @@
     function readFileAsDataURL(file){ return new Promise((ok,ng)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=ng; r.readAsDataURL(file); }); }
     function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // 初期描画
     render();
   </script>
 </body>
