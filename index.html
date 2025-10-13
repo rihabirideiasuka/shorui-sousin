@@ -134,7 +134,7 @@
   <script>
     /* ================== 設定：ここだけ変更 ================== */
     // ↓ 自分の GAS Webアプリ（/exec）のURLに置き換えてください
-    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzGeSi9Tttj4VjctJVykZS8On3Wc4UWL56sVem1EWUzmA3xUZYn8MxlYbQR-epvbRGO/exec';
+    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxwrrTrEJJVJGacg6lOI3gZ_VwHSvBaHSW0JLB6q8hq8n2HHAMdWNKE9uGvqgxzM_2i/exec';
     const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
     const MAX_BYTES  = 25*1024*1024;
     /* ======================================================= */
@@ -239,25 +239,54 @@
         const note = document.getElementById('note').value || '';
         let okCount=0, maybeCount=0;
 
-        for(const f of queue){
+        for (const f of queue) {
           const packed = await toBase64WithOptionalResize(f);
-          if(packed.bytes>MAX_BYTES){ sending.style.display='none'; alert(`${f.name} が上限を超えます。`); sendBtn.disabled=false; return; }
-
-          const payload = { note, items:[{name:f.name, mime:packed.mime, base64:packed.base64}] };
-          const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
-
-          let success=false;
-          for(let attempt=0; attempt<2 && !success; attempt++){
-            try{
-              const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
-              const data = await resp.json();
-              if(data && data.ok){ okCount += data.count||0; success=true; }
-              else throw new Error(data && data.error || 'UPLOAD_FAILED');
-            }catch(_e){
-              if(attempt===0) await new Promise(r=>setTimeout(r,600)); // 1回だけリトライ
-            }
+          if (packed.bytes > MAX_BYTES) {
+            sending.style.display = 'none';
+            alert(`${f.name} が上限を超えます。`);
+            sendBtn.disabled = false;
+            return;
           }
-          if(!success){ maybeCount++; }
+        
+          const payload = { note, items: [{ name: f.name, mime: packed.mime, base64: packed.base64 }] };
+          const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
+        
+          let success = false;
+          try {
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain' }, // プリフライト回避
+              body: JSON.stringify(payload)
+            });
+        
+            // ---- ここが「B) エラー内容を確認できるように」の肝 ----
+            let data;
+            const ct = resp.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              data = await resp.json();
+            } else {
+              const text = await resp.text();
+              // ログインHTMLやエラーページが返ってくる場合の可視化
+              console.error('NON_JSON_RESPONSE:', text.substring(0, 400));
+              throw new Error('NON_JSON_RESPONSE: ' + text.substring(0, 200));
+            }
+        
+            if (!resp.ok || !data?.ok) {
+              throw new Error(data?.error || ('UPLOAD_FAILED_HTTP_' + resp.status));
+            }
+        
+            // 成功
+            success = true;
+            okCount += data.count || 0;
+        
+          } catch (err) {
+            console.error('UPLOAD_ERROR:', err);
+            // ここで「毎回 可能性…」に落ちている原因がコンソールに出ます
+          }
+        
+          if (!success) {
+            maybeCount++;
+          }
         }
 
         sending.style.display='none';
@@ -297,4 +326,5 @@
   </script>
 </body>
 </html>
+
 
