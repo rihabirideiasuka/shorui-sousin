@@ -1,5 +1,5 @@
 {
-  "name": "書類アップロード",
+  "name": "書類等アップロード",
   "short_name": "書類送信",
   "start_url": "./",
   "display": "standalone",
