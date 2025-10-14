@@ -56,7 +56,8 @@
     .bar{width:40%;height:100%;background:var(--primary);animation:indef 1.2s infinite}
     @keyframes indef{0%{transform:translateX(-60%)}100%{transform:translateX(160%)}}
 
-    .done{display:none;margin-top:14px}.done.show{display:block}
+    .done{display:none;margin-top:14px}
+    .done.show{display:block}
     .done h2{margin:0 0 6px;font-size:22px}
 
     /* ===== カメラ全画面＆連続撮影 ===== */
@@ -91,6 +92,9 @@
           <button type="button" class="btn btn-primary" id="camBtn">📸 写真を撮影して送る</button>
         </div>
         <div class="mini">※ カメラは「撮影して追加」後も続けて撮影できます</div>
+
+        <!-- カメラ利用ヘルプ（Androidでアルバムが開く等の案内を出す） -->
+        <div id="camHelp" class="msg msg-bad" style="display:none"></div>
 
         <!-- ファイル input は隠す -->
         <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
@@ -137,7 +141,7 @@
 
   <script>
     /* ==== あなたの GAS /exec に変更 ==== */
-    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxWoLIuxw0pO9sJepiUn2TTRbZYV_cKvov6V4goKnvalTCynvJ17sepLxHKpSGKOJ9L/exec';
+    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzsiYOwt1Bcdsg5XM0ejEB9csC9i9qWXabNN-GqdMO60Dxe6sdjet44D9KHDC7ttoal/exec';
     /* ================================== */
 
     const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
@@ -164,16 +168,53 @@
     pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
     cameraFile.addEventListener('change',e=>{ if(e.target.files[0]) queue.push(e.target.files[0]); e.target.value=''; render(); });
 
-    // ===== カメラ（getUserMedia） =====
+    // ===== カメラ（詳細なエラーメッセージ付き） =====
     async function openCameraOrFallback(){
-      if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
+      hideCamHelp();
+      const ua = navigator.userAgent || '';
+      const inApp = /Line|Instagram|FBAN|FBAV|Twitter|Weibo|WeChat|Pinterest/i.test(ua);
+
+      if (!navigator.mediaDevices?.getUserMedia){
+        showCamHelp('このブラウザではカメラ機能が使えません。Chrome で開くか、アルバムから選択してください。');
+        cameraFile.click();
+        return;
+      }
+
       try{
-        camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'} }, audio:false });
-        camVideo.srcObject=camStream; camModal.classList.add('show'); camModal.setAttribute('aria-hidden','false');
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video:{ facingMode:{ideal:'environment'} }, audio:false
+        });
+        camVideo.srcObject=camStream;
+        camModal.classList.add('show'); camModal.setAttribute('aria-hidden','false');
         document.body.style.overflow='hidden';
         camAdded=0;
-      }catch(e){ cameraFile.click(); }
+      }catch(err){
+        const name = err && (err.name || err.toString());
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          showCamHelp('カメラへのアクセスが拒否されています。アドレスバーの錠（🔒）→ サイトの設定 → カメラを「許可」にしてください。');
+        } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+          showCamHelp('カメラが見つかりませんでした。別のカメラ付き端末でお試しください。');
+        } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+          showCamHelp('他のアプリがカメラを使用中の可能性があります。アプリを閉じてから再度お試しください。');
+        } else if (name === 'SecurityError' || inApp) {
+          showCamHelp('アプリ内ブラウザではカメラが使えない場合があります。右上メニューから「Chrome で開く」を選ぶと撮影できます。');
+        } else {
+          showCamHelp('カメラを起動できませんでした。Chrome で開くか、アルバムから選択してください。');
+        }
+        cameraFile.click(); // 代替としてアルバム
+      }
     }
+    function showCamHelp(message, kind='bad'){
+      const el = document.getElementById('camHelp');
+      el.className = 'msg ' + (kind === 'info' ? 'msg-info' : 'msg-bad');
+      el.textContent = message;
+      el.style.display = 'block';
+    }
+    function hideCamHelp(){
+      const el = document.getElementById('camHelp');
+      el.style.display = 'none';
+    }
+
     function stopCamera(){
       if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
       camVideo.srcObject=null; camModal.classList.remove('show'); camModal.setAttribute('aria-hidden','true');
@@ -191,14 +232,12 @@
       const d=new Date(), z=n=>String(n).padStart(2,'0');
       const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
       queue.push(new File([blob],name,{type:'image/jpeg'}));
-      camAdded++;
-      showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
+      camAdded++; showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
     };
 
     function showToast(msg){
       toast.textContent=msg;
       toast.classList.remove('show');
-      // 次フレームで付け直し（再生させる）
       requestAnimationFrame(()=>{ toast.classList.add('show'); });
     }
 
@@ -221,9 +260,6 @@
       });
       document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
 
-      // 事前チェック
-      const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
-      const MAX_BYTES = 25*1024*1024;
       if(queue.some(f=>!ALLOW_MIME.includes((f.type||'').toLowerCase()))){
         precheck.className='msg msg-bad'; precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。'; sendBtn.disabled=true; return;
       }
@@ -240,7 +276,7 @@
       sendBtn.disabled=false;
     }
 
-    // ===== 送信（件数は表示しない） =====
+    // ===== 送信（件数は表示しない／完了のみ） =====
     document.getElementById('f').addEventListener('submit',(e)=>{
       e.preventDefault(); if(!queue.length) return;
       (async ()=>{
@@ -258,11 +294,12 @@
             const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
             const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
 
+            // 成否を待たずに送る簡潔版（CORS問題回避）
             await fetch(url, {
               method:'POST',
               headers:{'Content-Type':'text/plain'},
               body:JSON.stringify(payload),
-              mode:'no-cors' // 成功/失敗に関わらず完了表示する簡潔版
+              mode:'no-cors'
             });
           }catch(_){ /* 失敗しても黙る */ }
         }
