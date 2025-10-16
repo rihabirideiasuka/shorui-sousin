@@ -72,6 +72,24 @@
            padding:10px 14px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:10000;display:none}
     .toast.show{display:block;animation:fade 2.4s ease forwards}
     @keyframes fade{0%{opacity:0;transform:translate(-50%,-6px)}10%{opacity:1;transform:translate(-50%,0)}90%{opacity:1}100%{opacity:0}}
+
+    /* 撮影ボタンの枚数バッジ */
+    .badge{
+      display:inline-block;
+      min-width:1.6em;
+      padding:0 .45em;
+      margin-left:.5em;
+      font-size:.85em;
+      font-weight:700;
+      line-height:1.6em;
+      text-align:center;
+      color:#1556d1;               /* 文字は青 */
+      background:#fff;             /* バッジは白 */
+      border:2px solid #fff;       /* 視認性UP */
+      border-radius:999px;
+      vertical-align:middle;
+    }
+    .badge[hidden]{ display:none; }
   </style>
 </head>
 <body>
@@ -127,13 +145,18 @@
       <video id="camVideo" autoplay playsinline></video>
       <div class="controls">
         <button type="button" class="btn" id="camClose">完了して閉じる</button>
-        <button type="button" class="btn btn-primary" id="camShot">撮影して追加</button>
+        <button type="button" class="btn btn-primary" id="camShot">
+          撮影して追加 <span id="shotBadge" class="badge" hidden>0</span>
+        </button>
       </div>
     </div>
   </div>
 
   <!-- 追加アピール用トースト -->
   <div id="toast" class="toast">✅ 追加しました</div>
+
+  <!-- iOSでの自動再生対策：初回タップでアンロックするための透明ボタン（視覚非表示） -->
+  <button id="audioUnlock" style="position:fixed;inset:0;opacity:0;pointer-events:none;border:0;background:transparent"></button>
 
   <script>
     /* ==== あなたの GAS /exec に変更 ==== */
@@ -153,105 +176,158 @@
     // カメラ
     const camModal=$('#camModal'), camVideo=$('#camVideo');
     const camClose=$('#camClose'), camShot=$('#camShot');
+    const shotBadge = document.getElementById('shotBadge');
     let camStream=null, camAdded=0;
 
-    // 追加ボタン
+    // ===== シャッター音（確実に鳴らすための多重対策） =====
+    // 1) <audio> 要素（iOSに強い）
+    const shutterAudio = new Audio();
+    shutterAudio.src =
+      'data:audio/mp3;base64,SUQzBAAAAAAAF1RTU0UAAAAPAAAAUAAACAA...'; 
+      // ↑ ここに短いシャッター音の base64（~20KB程度）を入れてください
+      //   著作権的に問題ない効果音を使うか、無音にしてもOK
+    shutterAudio.preload = 'auto';
+    shutterAudio.playsInline = true;  // iOS Safari
+    shutterAudio.setAttribute('webkit-playsinline','');
+
+    // 2) AudioContext + Buffer（<audio>失敗時の保険）
+    let actx = null, shutterBuf = null, audioUnlocked = false;
+
+    async function ensureAudioUnlocked(){
+      // 初タップで iOS のAudio制限を解除
+      try{
+        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') await actx.resume();
+        // iOSの仕様で何らかの再生を試みる必要がある
+        audioUnlocked = true;
+      }catch(_){}
+    }
+
+    async function loadShutterBufferOnce(){
+      if (shutterBuf) return;
+      try{
+        // <audio> のソースをそのまま fetch できないので、別途 base64 を ArrayBuffer に変換
+        const base64 = shutterAudio.src.split(',')[1] || '';
+        const bin = atob(base64);
+        const len = bin.length;
+        const buf = new Uint8Array(len);
+        for(let i=0;i<len;i++) buf[i] = bin.charCodeAt(i);
+        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        shutterBuf = await actx.decodeAudioData(buf.buffer);
+      }catch(_){}
+    }
+
+    async function playShutter(){
+      // try #1: <audio> を先頭から鳴らす
+      try{
+        shutterAudio.currentTime = 0;
+        await shutterAudio.play();
+        return;
+      }catch(_){ /* fallthrough */ }
+
+      // try #2: WebAudio
+      try{
+        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        if(actx.state === 'suspended') await actx.resume();
+        await loadShutterBufferOnce();
+        if(shutterBuf){
+          const src = actx.createBufferSource();
+          src.buffer = shutterBuf;
+          src.connect(actx.destination);
+          src.start(0);
+          return;
+        }
+      }catch(_){ /* fallthrough */ }
+
+      // Fallback: 触覚（Android の多くと iOS 一部で振動）
+      if (navigator.vibrate) navigator.vibrate(30);
+    }
+
+    // 初回タップでオーディオを確実にアンロック
+    function primeAudioOnce(){
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      ensureAudioUnlocked();
+      // 見えないボタンに一瞬 focus を与えてユーザー操作扱いを強化（iOS対策）
+      const unlockBtn = document.getElementById('audioUnlock');
+      unlockBtn.style.pointerEvents = 'auto';
+      setTimeout(() => { unlockBtn.style.pointerEvents = 'none'; }, 0);
+    }
+    window.addEventListener('touchstart', primeAudioOnce, { once:true, passive:true });
+    window.addEventListener('mousedown', primeAudioOnce, { once:true });
+
+    // ===== 追加ボタン =====
     $('#pickBtn').onclick=()=>pickInput.click();
     $('#camBtn').onclick =()=>openCameraOrFallback();
     $('#clearBtn').onclick=()=>{queue.length=0;render();};
 
-    // 選択イベント（アルバム）
-    pickInput.addEventListener('change',e=>{
-      for(const f of e.target.files) queue.push(f);
-      e.target.value=''; render();
-    });
-    // カメラのフォールバック input
-    cameraFile.addEventListener('change',e=>{
-      if(e.target.files[0]) queue.push(e.target.files[0]);
-      e.target.value=''; render();
-    });
-
-    // ======= シャッター音（安定版） =======
-    let audioCtx = null;
-    let shutterBuffer = null;
-    async function setupAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state !== 'running') {
-        try { await audioCtx.resume(); } catch (_) {}
-      }
-      if (!shutterBuffer) {
-        const dur = 0.12;
-        const sr  = audioCtx.sampleRate;
-        const len = Math.floor(dur * sr);
-        const buf = audioCtx.createBuffer(1, len, sr);
-        const ch  = buf.getChannelData(0);
-        for (let i = 0; i < len; i++) {
-          const t = i / sr;
-          const env = Math.exp(-t * 18);
-          ch[i] = (Math.random() * 2 - 1) * 0.45 * env;
-        }
-        shutterBuffer = buf;
-      }
-    }
-    async function playShutter() {
-      try {
-        await setupAudio();
-        if (audioCtx.state !== 'running') {
-          try { await audioCtx.resume(); } catch (_) {}
-        }
-        const src = audioCtx.createBufferSource();
-        src.buffer = shutterBuffer;
-        src.connect(audioCtx.destination);
-        src.start(0);
-      } catch (e) {
-        if (navigator.vibrate) navigator.vibrate(60);
-      }
-    }
-    ['click','touchend'].forEach(ev=>{
-      window.addEventListener(ev, ()=>{ if (!audioCtx) setupAudio(); }, {once:true});
-    });
-    document.addEventListener('visibilitychange', async ()=>{
-      if (document.visibilityState === 'visible' && audioCtx && audioCtx.state !== 'running') {
-        try { await audioCtx.resume(); } catch(_) {}
-      }
-    });
-    // ======================================
+    // 選択イベント
+    pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
+    cameraFile.addEventListener('change',e=>{ if(e.target.files[0]) queue.push(e.target.files[0]); e.target.value=''; render(); });
 
     // ===== カメラ（getUserMedia） =====
     async function openCameraOrFallback(){
       if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
       try{
-        camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'} }, audio:false });
-        camVideo.srcObject=camStream; camModal.classList.add('show'); camModal.setAttribute('aria-hidden','false');
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video:{ facingMode:{ideal:'environment'} }, audio:false
+        });
+        camVideo.srcObject=camStream;
+        camModal.classList.add('show');
+        camModal.setAttribute('aria-hidden','false');
         document.body.style.overflow='hidden';
         camAdded=0;
-        // 初回アンロックを確実に
-        try { await setupAudio(); } catch(_){}
-      }catch(e){ cameraFile.click(); }
+        updateShotBadge();
+      }catch(e){
+        // 権限拒否・非対応 → 端末のカメラUIにフォールバック
+        cameraFile.click();
+      }
     }
     function stopCamera(){
       if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
-      camVideo.srcObject=null; camModal.classList.remove('show'); camModal.setAttribute('aria-hidden','true');
+      camVideo.srcObject=null;
+      camModal.classList.remove('show');
+      camModal.setAttribute('aria-hidden','true');
       document.body.style.overflow='';
+      camAdded=0; updateShotBadge();
     }
     camClose.onclick=()=>{ stopCamera(); render(); };
 
-    // 連続撮影：閉じずに queue に追加 & トースト＆シャッター音
+    // 連続撮影：閉じずに queue に追加 & トースト & バッジ & シャッター
     camShot.onclick=async ()=>{
       if(!camStream) return;
-      const track=camStream.getVideoTracks()[0], s=track.getSettings?track.getSettings():{};
-      const w=s.width||camVideo.videoWidth||1280, h=s.height||camVideo.videoHeight||720;
-      const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(camVideo,0,0,w,h);
-      const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
-      const d=new Date(), z=n=>String(n).padStart(2,'0');
-      const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
-      queue.push(new File([blob],name,{type:'image/jpeg'}));
-      camAdded++;
-      playShutter();
-      showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
+      try{
+        const track=camStream.getVideoTracks()[0];
+        const s=track.getSettings?track.getSettings():{};
+        const w=s.width||camVideo.videoWidth||1280, h=s.height||camVideo.videoHeight||720;
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(camVideo,0,0,w,h);
+        const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
+        const d=new Date(), z=n=>String(n).padStart(2,'0');
+        const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
+
+        // シャッター音（先に鳴らすと体感が良い）
+        await playShutter();
+
+        queue.push(new File([blob],name,{type:'image/jpeg'}));
+        camAdded++;
+        updateShotBadge();
+        showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
+      }catch(_){
+        // 音が鳴らなかったとしても、フォールバックで振動を一応
+        if (navigator.vibrate) navigator.vibrate(30);
+      }
     };
+
+    function updateShotBadge(){
+      if (!shotBadge) return;
+      if (camAdded > 0){
+        shotBadge.textContent = camAdded;
+        shotBadge.hidden = false;
+      } else {
+        shotBadge.hidden = true;
+      }
+    }
 
     function showToast(msg){
       toast.textContent=msg;
@@ -282,25 +358,26 @@
       });
       document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
 
-      if(queue.some(f=>!ALLOW_MIME.includes((f.type||'').toLowerCase()))){
-        precheck.className='msg msg-bad'; precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。';
-        sendBtn.disabled=true; return;
-      }
       const overs=queue.filter(f=>f.size>MAX_BYTES);
       if(overs.length){
         precheck.className='msg msg-bad';
         precheck.innerHTML=`⚠ 上限<strong>${Math.round(MAX_BYTES/1024/1024)}MB</strong>を超えています：<br>${
           overs.map(f=>`${escapeHtml(f.name)}（${(f.size/1024/1024).toFixed(1)}MB）`).join('、 ')
-        }`;
+        }`; sendBtn.disabled=true; return;
+      }
+      if(queue.some(f=>!ALLOW_MIME.includes((f.type||'').toLowerCase()))){
+        precheck.className='msg msg-bad';
+        precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。';
         sendBtn.disabled=true; return;
       }
+
       const sum=queue.reduce((s,f)=>s+f.size,0);
       precheck.className='msg msg-ok';
       precheck.innerHTML=`👍 送信できます。選択枚数：<strong>${queue.length}</strong>、合計：約<strong>${(sum/1024/1024).toFixed(1)}MB</strong>`;
       sendBtn.disabled=false;
     }
 
-    // ===== 送信（件数は表示しない／CORSは no-cors で無視） =====
+    // ===== 送信（件数は表示しない簡潔版） =====
     document.getElementById('f').addEventListener('submit',(e)=>{
       e.preventDefault(); if(!queue.length) return;
       (async ()=>{
@@ -318,11 +395,12 @@
             const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
             const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
 
+            // CORSの煩雑さを避けるため no-cors（成功/失敗の詳細は見ない）
             await fetch(url, {
               method:'POST',
               headers:{'Content-Type':'text/plain'},
               body:JSON.stringify(payload),
-              mode:'no-cors' // レスポンスを見ずに成功UIへ
+              mode:'no-cors'
             });
           }catch(_){ /* 失敗しても黙る */ }
         }
@@ -358,8 +436,8 @@
     function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+    // 初期描画
     render();
   </script>
 </body>
 </html>
-
