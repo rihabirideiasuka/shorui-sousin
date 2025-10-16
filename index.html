@@ -27,7 +27,7 @@
     input[type="text"]{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:14px;font-size:16px}
 
     /* ===== ボタン ===== */
-    .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease}
+    .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease; position:relative}
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--primary);color:#fff}
     .btn-danger{background:var(--danger);color:#fff}
@@ -73,23 +73,17 @@
     .toast.show{display:block;animation:fade 2.4s ease forwards}
     @keyframes fade{0%{opacity:0;transform:translate(-50%,-6px)}10%{opacity:1;transform:translate(-50%,0)}90%{opacity:1}100%{opacity:0}}
 
-    /* 撮影ボタンの枚数バッジ */
-    .badge{
-      display:inline-block;
-      min-width:1.6em;
-      padding:0 .45em;
-      margin-left:.5em;
-      font-size:.85em;
-      font-weight:700;
-      line-height:1.6em;
-      text-align:center;
-      color:#1556d1;               /* 文字は青 */
-      background:#fff;             /* バッジは白 */
-      border:2px solid #fff;       /* 視認性UP */
-      border-radius:999px;
-      vertical-align:middle;
+    /* ==== バッジ（疑似要素で表示 / data-badge） ==== */
+    .btn-badge::after{
+      content: attr(data-badge);
+      position:absolute; right:12px; top:10px;
+      background:#fff; color:#1556d1; border-radius:999px;
+      min-width:1.4em; height:1.4em; line-height:1.4em;
+      padding:0 .45em; font-weight:700; font-size:.85em; text-align:center;
+      display:none;
+      box-shadow:0 1px 0 rgba(0,0,0,.08);
     }
-    .badge[hidden]{ display:none; }
+    .btn-badge.has-badge::after{ display:inline-block; }
   </style>
 </head>
 <body>
@@ -106,7 +100,7 @@
         <!-- 等幅の2ボタン -->
         <div class="btn-row">
           <button type="button" class="btn btn-primary" id="pickBtn">📁 アルバムから写真を選択して送る</button>
-          <button type="button" class="btn btn-primary" id="camBtn">📸 写真を撮影して送る</button>
+          <button type="button" class="btn btn-primary btn-badge" id="camBtn">📸 写真を撮影して送る</button>
         </div>
         <div class="mini">※ カメラは「撮影して追加」後も続けて撮影できます</div>
 
@@ -145,9 +139,7 @@
       <video id="camVideo" autoplay playsinline></video>
       <div class="controls">
         <button type="button" class="btn" id="camClose">完了して閉じる</button>
-        <button type="button" class="btn btn-primary" id="camShot">
-          撮影して追加 <span id="shotBadge" class="badge" hidden>0</span>
-        </button>
+        <button type="button" class="btn btn-primary btn-badge" id="camShot">撮影して追加</button>
       </div>
     </div>
   </div>
@@ -155,12 +147,12 @@
   <!-- 追加アピール用トースト -->
   <div id="toast" class="toast">✅ 追加しました</div>
 
-  <!-- iOSでの自動再生対策：初回タップでアンロックするための透明ボタン（視覚非表示） -->
+  <!-- iOSのオーディオ制限解除トリガ -->
   <button id="audioUnlock" style="position:fixed;inset:0;opacity:0;pointer-events:none;border:0;background:transparent"></button>
 
   <script>
     /* ==== あなたの GAS /exec に変更 ==== */
-    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzsiYOwt1Bcdsg5XM0ejEB9csC9i9qWXabNN-GqdMO60Dxe6sdjet44D9KHDC7ttoal/exec';
+    const API_ENDPOINT = 'https://script.google.com/macros/s/___REPLACE_WITH_YOUR_EXEC___/exec';
     /* ================================== */
 
     const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
@@ -176,90 +168,56 @@
     // カメラ
     const camModal=$('#camModal'), camVideo=$('#camVideo');
     const camClose=$('#camClose'), camShot=$('#camShot');
-    const shotBadge = document.getElementById('shotBadge');
+    const camBtn=$('#camBtn');
     let camStream=null, camAdded=0;
 
-    // ===== シャッター音（確実に鳴らすための多重対策） =====
-    // 1) <audio> 要素（iOSに強い）
+    // ===== シャッター音（多重対策） =====
     const shutterAudio = new Audio();
-    shutterAudio.src =
-      'data:audio/mp3;base64,SUQzBAAAAAAAF1RTU0UAAAAPAAAAUAAACAA...'; 
-      // ↑ ここに短いシャッター音の base64（~20KB程度）を入れてください
-      //   著作権的に問題ない効果音を使うか、無音にしてもOK
-    shutterAudio.preload = 'auto';
-    shutterAudio.playsInline = true;  // iOS Safari
-    shutterAudio.setAttribute('webkit-playsinline','');
+    shutterAudio.src = 'data:audio/mp3;base64,/* ←あなたの短いシャッター音のbase64に差し替え */';
+    shutterAudio.preload='auto'; shutterAudio.playsInline=true; shutterAudio.setAttribute('webkit-playsinline','');
+    let actx=null, shutterBuf=null, audioUnlocked=false;
 
-    // 2) AudioContext + Buffer（<audio>失敗時の保険）
-    let actx = null, shutterBuf = null, audioUnlocked = false;
-
-    async function ensureAudioUnlocked(){
-      // 初タップで iOS のAudio制限を解除
-      try{
-        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-        if (actx.state === 'suspended') await actx.resume();
-        // iOSの仕様で何らかの再生を試みる必要がある
-        audioUnlocked = true;
-      }catch(_){}
-    }
-
+    async function ensureAudioUnlocked(){ try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') await actx.resume(); audioUnlocked=true; }catch(_){} }
     async function loadShutterBufferOnce(){
-      if (shutterBuf) return;
+      if(shutterBuf) return;
       try{
-        // <audio> のソースをそのまま fetch できないので、別途 base64 を ArrayBuffer に変換
-        const base64 = shutterAudio.src.split(',')[1] || '';
-        const bin = atob(base64);
-        const len = bin.length;
-        const buf = new Uint8Array(len);
-        for(let i=0;i<len;i++) buf[i] = bin.charCodeAt(i);
-        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-        shutterBuf = await actx.decodeAudioData(buf.buffer);
+        const base64 = (shutterAudio.src.split(',')[1]||''); const bin=atob(base64);
+        const u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+        if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+        shutterBuf=await actx.decodeAudioData(u8.buffer);
       }catch(_){}
     }
-
     async function playShutter(){
-      // try #1: <audio> を先頭から鳴らす
+      try{ shutterAudio.currentTime=0; await shutterAudio.play(); return; }catch(_){}
       try{
-        shutterAudio.currentTime = 0;
-        await shutterAudio.play();
-        return;
-      }catch(_){ /* fallthrough */ }
-
-      // try #2: WebAudio
-      try{
-        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-        if(actx.state === 'suspended') await actx.resume();
-        await loadShutterBufferOnce();
-        if(shutterBuf){
-          const src = actx.createBufferSource();
-          src.buffer = shutterBuf;
-          src.connect(actx.destination);
-          src.start(0);
-          return;
-        }
-      }catch(_){ /* fallthrough */ }
-
-      // Fallback: 触覚（Android の多くと iOS 一部で振動）
-      if (navigator.vibrate) navigator.vibrate(30);
+        if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+        if(actx.state==='suspended') await actx.resume();
+        await loadShutterBufferOnce(); if(shutterBuf){ const src=actx.createBufferSource(); src.buffer=shutterBuf; src.connect(actx.destination); src.start(0); return; }
+      }catch(_){}
+      if(navigator.vibrate) navigator.vibrate(30);
     }
-
-    // 初回タップでオーディオを確実にアンロック
     function primeAudioOnce(){
-      if (audioUnlocked) return;
-      audioUnlocked = true;
-      ensureAudioUnlocked();
-      // 見えないボタンに一瞬 focus を与えてユーザー操作扱いを強化（iOS対策）
-      const unlockBtn = document.getElementById('audioUnlock');
-      unlockBtn.style.pointerEvents = 'auto';
-      setTimeout(() => { unlockBtn.style.pointerEvents = 'none'; }, 0);
+      if(audioUnlocked) return; audioUnlocked=true; ensureAudioUnlocked();
+      const unlock=document.getElementById('audioUnlock'); unlock.style.pointerEvents='auto'; setTimeout(()=>unlock.style.pointerEvents='none',0);
     }
     window.addEventListener('touchstart', primeAudioOnce, { once:true, passive:true });
     window.addEventListener('mousedown', primeAudioOnce, { once:true });
 
+    // ===== バッジ更新（疑似要素：data-badge と has-badge を切替） =====
+    function setBadge(el, n){
+      if(!el) return;
+      if(n>0){ el.dataset.badge = String(n); el.classList.add('has-badge'); }
+      else { el.dataset.badge = ''; el.classList.remove('has-badge'); }
+    }
+    function updateAllBadges(){
+      setBadge(camShot, camAdded);   // モーダル内「撮影して追加」
+      setBadge(camBtn,  camAdded);   // トップの「写真を撮影して送る」
+    }
+
     // ===== 追加ボタン =====
     $('#pickBtn').onclick=()=>pickInput.click();
     $('#camBtn').onclick =()=>openCameraOrFallback();
-    $('#clearBtn').onclick=()=>{queue.length=0;render();};
+    $('#clearBtn').onclick=()=>{queue.length=0;render(); updateAllBadges();};
 
     // 選択イベント
     pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
@@ -269,65 +227,39 @@
     async function openCameraOrFallback(){
       if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
       try{
-        camStream = await navigator.mediaDevices.getUserMedia({
-          video:{ facingMode:{ideal:'environment'} }, audio:false
-        });
+        camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'} }, audio:false });
         camVideo.srcObject=camStream;
-        camModal.classList.add('show');
-        camModal.setAttribute('aria-hidden','false');
+        camModal.classList.add('show'); camModal.setAttribute('aria-hidden','false');
         document.body.style.overflow='hidden';
-        camAdded=0;
-        updateShotBadge();
-      }catch(e){
-        // 権限拒否・非対応 → 端末のカメラUIにフォールバック
-        cameraFile.click();
-      }
+        camAdded=0; updateAllBadges();
+      }catch(e){ cameraFile.click(); }
     }
     function stopCamera(){
       if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
-      camVideo.srcObject=null;
-      camModal.classList.remove('show');
-      camModal.setAttribute('aria-hidden','true');
+      camVideo.srcObject=null; camModal.classList.remove('show'); camModal.setAttribute('aria-hidden','true');
       document.body.style.overflow='';
-      camAdded=0; updateShotBadge();
+      // モーダルを閉じてもバッジは撮影累計を残したい場合はコメントアウト
+      // camAdded=0;
+      updateAllBadges();
     }
     camClose.onclick=()=>{ stopCamera(); render(); };
 
-    // 連続撮影：閉じずに queue に追加 & トースト & バッジ & シャッター
+    // 連続撮影
     camShot.onclick=async ()=>{
       if(!camStream) return;
-      try{
-        const track=camStream.getVideoTracks()[0];
-        const s=track.getSettings?track.getSettings():{};
-        const w=s.width||camVideo.videoWidth||1280, h=s.height||camVideo.videoHeight||720;
-        const c=document.createElement('canvas'); c.width=w; c.height=h;
-        c.getContext('2d').drawImage(camVideo,0,0,w,h);
-        const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
-        const d=new Date(), z=n=>String(n).padStart(2,'0');
-        const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
+      const track=camStream.getVideoTracks()[0], s=track.getSettings?track.getSettings():{};
+      const w=s.width||camVideo.videoWidth||1280, h=s.height||camVideo.videoHeight||720;
+      const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(camVideo,0,0,w,h);
+      const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
+      const d=new Date(), z=n=>String(n).padStart(2,'0');
+      const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
 
-        // シャッター音（先に鳴らすと体感が良い）
-        await playShutter();
-
-        queue.push(new File([blob],name,{type:'image/jpeg'}));
-        camAdded++;
-        updateShotBadge();
-        showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
-      }catch(_){
-        // 音が鳴らなかったとしても、フォールバックで振動を一応
-        if (navigator.vibrate) navigator.vibrate(30);
-      }
+      await playShutter();                  // 音 → 体感的に先
+      queue.push(new File([blob],name,{type:'image/jpeg'}));
+      camAdded++;                           // 枚数インクリメント
+      updateAllBadges();                    // ← バッジ確実更新
+      showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
     };
-
-    function updateShotBadge(){
-      if (!shotBadge) return;
-      if (camAdded > 0){
-        shotBadge.textContent = camAdded;
-        shotBadge.hidden = false;
-      } else {
-        shotBadge.hidden = true;
-      }
-    }
 
     function showToast(msg){
       toast.textContent=msg;
@@ -340,8 +272,7 @@
       thumbs.innerHTML='';
       if(queue.length>0) doneBox.classList.remove('show');
       if(!queue.length){
-        precheck.className='msg msg-info';
-        precheck.textContent='選択されたファイルはありません。';
+        precheck.className='msg msg-info'; precheck.textContent='選択されたファイルはありません。';
         sendBtn.disabled=true; return;
       }
 
@@ -349,7 +280,7 @@
         const card=document.createElement('div'); card.className='thumb';
         const img=document.createElement('img');
         if((f.type||'').startsWith('image/')){ img.src=URL.createObjectURL(f); img.onload=()=>URL.revokeObjectURL(img.src); }
-        else { img.alt='ファイル'; img.style.background='#eef3ff'; }
+        else { img.alt='ファイル'; img.style.background:'#eef3ff'; }
         const meta=document.createElement('div'); meta.className='meta';
         meta.innerHTML=`<div class="row"><strong>${escapeHtml(f.name)}</strong></div>
                         <div class="row"><span>${(f.size/1024/1024).toFixed(1)} MB</span>
@@ -377,7 +308,7 @@
       sendBtn.disabled=false;
     }
 
-    // ===== 送信（件数は表示しない簡潔版） =====
+    // ===== 送信（件数は出さず簡潔） =====
     document.getElementById('f').addEventListener('submit',(e)=>{
       e.preventDefault(); if(!queue.length) return;
       (async ()=>{
@@ -391,24 +322,24 @@
           try{
             const packed = await toBase64WithOptionalResize(f);
             if (packed.bytes > MAX_BYTES) continue;
-
             const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
             const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
 
-            // CORSの煩雑さを避けるため no-cors（成功/失敗の詳細は見ない）
             await fetch(url, {
               method:'POST',
               headers:{'Content-Type':'text/plain'},
               body:JSON.stringify(payload),
-              mode:'no-cors'
+              mode:'no-cors' // 成否は見ずに完了表示
             });
-          }catch(_){ /* 失敗しても黙る */ }
+          }catch(_){}
         }
 
         sending.style.display='none';
         doneBox.classList.add('show');
         queue.length=0; render();
         sendBtn.disabled=false;
+        // 送信後は撮影バッジをリセット
+        camAdded = 0; updateAllBadges();
       })();
     });
 
@@ -436,8 +367,9 @@
     function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-    // 初期描画
+    // 初期描画＆バッジ初期化
     render();
+    updateAllBadges();
   </script>
 </body>
 </html>
