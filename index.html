@@ -1,83 +1,72 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>書類アップロード</title>
 
-  <!-- PWA / icons（任意） -->
-  <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#1556d1">
-  <link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
-  <link rel="icon" href="./icons/favicon-16.png" sizes="16x16">
-  <link rel="icon" href="./icons/icon-192.png" sizes="192x192">
-  <link rel="icon" href="./icons/icon-512.png" sizes="512x512">
-  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  :root{--primary:#1556d1;--danger:#ef5753;--ok:#137333;--fg:#111;--muted:#666;--bg:#f6f7fb;--card:#fff}
+  html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans JP',sans-serif;line-height:1.6;margin:0}
+  .wrap{max-width:880px;margin:0 auto;padding:20px}
+  .card{background:var(--card);border-radius:18px;box-shadow:0 2px 14px rgba(0,0,0,.06);padding:20px}
+  h1{font-size:22px;margin:0 0 8px}
+  label{display:block;font-weight:600;margin:14px 0 6px}
+  input[type="text"]{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:14px;font-size:16px}
 
-  <title>書類アップロード</title>
-  <style>
-    *,*::before,*::after{box-sizing:border-box}
-    :root{--primary:#1556d1;--danger:#ef5753;--ok:#137333;--fg:#111;--muted:#666;--bg:#f6f7fb;--card:#fff}
-    html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans JP',sans-serif;line-height:1.6;margin:0}
-    .wrap{max-width:880px;margin:0 auto;padding:20px}
-    .card{background:var(--card);border-radius:18px;box-shadow:0 2px 14px rgba(0,0,0,.06);padding:20px}
-    h1{font-size:22px;margin:0 0 8px}
-    label{display:block;font-weight:600;margin:14px 0 6px}
-    input[type="text"]{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:14px;font-size:16px}
+  .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn[disabled]{opacity:.6;cursor:not-allowed}
 
-    .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease}
-    .btn:active{transform:translateY(1px)}
-    .btn-primary{background:var(--primary);color:#fff}
-    .btn-danger{background:var(--danger);color:#fff}
-    .btn[disabled]{opacity:.6;cursor:not-allowed}
+  .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+  .btn-bar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
 
-    .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
-    .btn-bar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+  .hint{font-size:14px;color:var(--muted);margin:6px 0}
+  .mini{font-size:12px;color:var(--muted);margin-top:4px}
 
-    .hint{font-size:14px;color:var(--muted);margin:6px 0}
-    .mini{font-size:12px;color:var(--muted);margin-top:4px}
+  .msg{padding:12px 14px;border-radius:12px;margin:10px 0;font-size:16px}
+  .msg-ok{background:#e9f5ee;color:var(--ok);border:1px solid #bfe5cd}
+  .msg-bad{background:#fdecec;color:#a12121;border:1px solid #f3c3c0}
+  .msg-info{background:#eef3ff;color:#274291;border:1px solid #cfdcff}
 
-    .msg{padding:12px 14px;border-radius:12px;margin:10px 0;font-size:16px}
-    .msg-ok{background:#e9f5ee;color:var(--ok);border:1px solid #bfe5cd}
-    .msg-bad{background:#fdecec;color:#a12121;border:1px solid #f3c3c0}
-    .msg-info{background:#eef3ff;color:#274291;border:1px solid #cfdcff}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:10px}
+  .thumb{background:#fafafa;border:1px solid #eee;border-radius:14px;overflow:hidden}
+  .thumb img{width:100%;height:120px;object-fit:cover;display:block;background:#fff}
+  .thumb .meta{padding:8px 10px;font-size:14px}
+  .thumb .row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .remove{background:#ffe7e7;color:#a12121;border:0;border-radius:10px;padding:6px 8px;font-weight:700;cursor:pointer}
 
-    .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:10px}
-    .thumb{background:#fafafa;border:1px solid #eee;border-radius:14px;overflow:hidden}
-    .thumb img{width:100%;height:120px;object-fit:cover;display:block;background:#fff}
-    .thumb .meta{padding:8px 10px;font-size:14px}
-    .thumb .row{display:flex;justify-content:space-between;gap:8px;align-items:center}
-    .remove{background:#ffe7e7;color:#a12121;border:0;border-radius:10px;padding:6px 8px;font-weight:700;cursor:pointer}
+  .progress{height:10px;background:#e8eefc;border-radius:999px;overflow:hidden;margin:10px 0 0}
+  .bar{width:40%;height:100%;background:var(--primary);animation:indef 1.2s infinite}
+  @keyframes indef{0%{transform:translateX(-60%)}100%{transform:translateX(160%)}}
 
-    .progress{height:10px;background:#e8eefc;border-radius:999px;overflow:hidden;margin:10px 0 0}
-    .bar{width:40%;height:100%;background:var(--primary);animation:indef 1.2s infinite}
-    @keyframes indef{0%{transform:translateX(-60%)}100%{transform:translateX(160%)}}
+  .done{display:none;margin-top:14px}.done.show{display:block}
+  .done h2{margin:0 0 6px;font-size:22px}
 
-    .done{display:none;margin-top:14px}.done.show{display:block}
-    .done h2{margin:0 0 6px;font-size:22px}
+  /* カメラモーダル */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:0;z-index:9999}
+  .modal.show{display:flex}
+  .cam{background:#000;width:100%;max-width:1000px;color:#fff;display:flex;flex-direction:column;height:100svh}
+  .cam video{flex:1 1 auto;width:100%;height:auto;object-fit:cover}
+  .cam .controls{display:flex;gap:10px;justify-content:space-between;padding:12px;background:rgba(0,0,0,.6)}
+  .cam .btn{flex:1;padding:14px;border-radius:12px}
 
-    /* カメラ */
-    .modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:0;z-index:9999}
-    .modal.show{display:flex}
-    .cam{background:#000;width:100%;max-width:1000px;color:#fff;display:flex;flex-direction:column;height:100svh}
-    .cam video{flex:1 1 auto;width:100%;height:auto;object-fit:cover}
-    .cam .controls{display:flex;gap:10px;justify-content:space-between;padding:12px;background:rgba(0,0,0,.6)}
-    .cam .btn{flex:1;padding:14px;border-radius:12px}
+  /* トースト */
+  .toast{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#e9f5ee;color:#0b6e3f;border:1px solid #bfe5cd;
+         padding:10px 14px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:10000;display:none}
+  .toast.show{display:block;animation:fade 2.4s ease forwards}
+  @keyframes fade{0%{opacity:0;transform:translate(-50%,-6px)}10%{opacity:1;transform:translate(-50%,0)}90%{opacity:1}100%{opacity:0}}
 
-    /* トースト */
-    .toast{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#e9f5ee;color:#0b6e3f;border:1px solid #bfe5cd;
-           padding:10px 14px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:10000;display:none}
-    .toast.show{display:block;animation:fade 2.4s ease forwards}
-    @keyframes fade{0%{opacity:0;transform:translate(-50%,-6px)}10%{opacity:1;transform:translate(-50%,0)}90%{opacity:1}100%{opacity:0}}
-
-    /* 枚数バッジ */
-    .badge{
-      display:inline-block;min-width:1.6em;padding:0 .45em;margin-left:.5em;font-size:.85em;font-weight:700;line-height:1.6em;
-      text-align:center;color:#1556d1;background:#fff;border:2px solid #fff;border-radius:999px;vertical-align:middle;
-    }
-    .badge[hidden]{display:none}
-  </style>
+  /* 枚数バッジ */
+  .badge{
+    display:inline-block;min-width:1.6em;padding:0 .45em;margin-left:.5em;font-size:.85em;font-weight:700;line-height:1.6em;
+    text-align:center;color:#1556d1;background:#fff;border:2px solid #fff;border-radius:999px;vertical-align:middle;
+  }
+  .badge[hidden]{display:none}
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -96,7 +85,6 @@
         </div>
         <div class="mini">※ カメラは「撮影して追加」後も続けて撮影できます</div>
 
-        <!-- 非表示 inputs -->
         <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
         <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
 
@@ -144,310 +132,286 @@
   <!-- iOSの初回再生制限対策（透明ボタン） -->
   <button id="audioUnlock" style="position:fixed;inset:0;opacity:0;pointer-events:none;border:0;background:transparent"></button>
 
-  <script>
-    /* ==== あなたの GAS /exec に変更 ==== */
-    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzsiYOwt1Bcdsg5XM0ejEB9csC9i9qWXabNN-GqdMO60Dxe6sdjet44D9KHDC7ttoal/exec';
-    /* ================================== */
+<script>
+  /* ==== あなたの GAS /exec に変更 ==== */
+  const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzsiYOwt1Bcdsg5XM0ejEB9csC9i9qWXabNN-GqdMO60Dxe6sdjet44D9KHDC7ttoal/exec';
+  /* ================================== */
 
-    const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
-    const MAX_BYTES  = 25*1024*1024;
+  const ALLOW_MIME = ['image/jpeg','image/png','application/pdf'];
+  const MAX_BYTES  = 25*1024*1024;
 
-    const queue=[]; const $=s=>document.querySelector(s);
-    const pickInput=$('#pick'), cameraFile=$('#cameraFile');
-    const thumbs=$('#thumbs'), precheck=$('#precheck');
-    const sendBtn=$('#sendBtn'), sending=$('#sending');
-    const doneBox=$('#done');
-    const toast=$('#toast');
+  const queue=[]; const $=s=>document.querySelector(s);
+  const pickInput=$('#pick'), cameraFile=$('#cameraFile');
+  const thumbs=$('#thumbs'), precheck=$('#precheck');
+  const sendBtn=$('#sendBtn'), sending=$('#sending');
+  const doneBox=$('#done');
+  const toast=$('#toast');
 
-    // カメラ
-    const camModal=$('#camModal'), camVideo=$('#camVideo');
-    const camClose=$('#camClose'), camShot=$('#camShot');
-    const shotBadge = document.getElementById('shotBadge');
-    let camStream=null, camAdded=0;
+  // カメラ
+  const camModal=$('#camModal'), camVideo=$('#camVideo');
+  const camClose=$('#camClose'), camShot=$('#camShot');
+  const shotBadge = document.getElementById('shotBadge');
+  let camStream=null, camAdded=0;
 
-    // ====== サウンド設定 ======
-    const SHUTTER_VOLUME = 1.0; // 0.0〜1.0（大きいほど音量大）
-    // フォールバック用：はっきり大きめの短い音（WAV, ~3KB）
-    const FALLBACK_WAV_BASE64 =
-      'UklGRm0XAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YUsXAACAgIDAwMDw8PD4+Pj9/f3////7+/v39/fz8/Pr6+vj4+Pf39/v7+/wAAAP39/fj4+Pr6+vz8/P/////7+/v39/f4+Pj5+fn7+/v9/f0AAAABAQEBAgICAwMDAwQEBAUFBQYGBgcHBwgICAkJCQoKCgoLCwsMDQ0NDg4ODw8PEBAQERER'
-      + 'EhISExMTFhYWFxcXGBgYGRkZGhoaGxsbHBwcHR0dHh4eHx8fICAgISEhIiIiIyMjJCQkJSUlJiYmJycnKioqKysrLCwsLS0tLi4uLy8v';
+  /* ====== サウンド（強化） ====== */
+  const SHUTTER_VOLUME = 1.0;
+  const FALLBACK_WAV_BASE64 =
+    'UklGRm0XAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YUsXAACAgIDAwMDw8PD4+Pj9/f3////7+/v39/fz8/Pr6+vj4+Pf39/v7+/wAAAP39/fj4+Pr6+vz8/P/////7+/v39/f4+Pj5+fn7+/v9/f0AAAABAQEBAgICAwMDAwQEBAUFBQYGBgcHBwgICAkJCQoKCgoLCwsMDQ0NDg4ODw8PEBAQERER'
+    +'EhISExMTFhYWFxcXGBgYGRkZGhoaGxsbHBwcHR0dHh4eHx8fICAgISEhIiIiIyMjJCQkJSUlJiYmJycnKioqKysrLCwsLS0tLi4uLy8v';
+  const shutterAudio = new Audio('data:audio/wav;base64,' + FALLBACK_WAV_BASE64);
+  shutterAudio.preload = 'auto'; shutterAudio.playsInline = true;
+  shutterAudio.setAttribute('webkit-playsinline',''); shutterAudio.volume = SHUTTER_VOLUME;
 
-    // 1) <audio> フォールバック
-    const shutterAudio = new Audio('data:audio/wav;base64,' + FALLBACK_WAV_BASE64);
-    shutterAudio.preload = 'auto';
-    shutterAudio.playsInline = true;
-    shutterAudio.setAttribute('webkit-playsinline','');
-    shutterAudio.volume = SHUTTER_VOLUME;
+  let actx=null, audioUnlocked=false;
+  async function ensureAudioUnlocked(){
+    try{
+      if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+      if(actx.state==='suspended') await actx.resume();
+      audioUnlocked=true;
+    }catch(_){}
+  }
+  function playShutterStrong(){
+    if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+    const now=actx.currentTime;
+    const master=actx.createGain(); master.gain.value=SHUTTER_VOLUME; master.connect(actx.destination);
+    // ピ（80ms）
+    const beep=actx.createOscillator(), gB=actx.createGain();
+    beep.type='sine'; beep.frequency.setValueAtTime(880,now);
+    gB.gain.setValueAtTime(0.0001,now); gB.gain.exponentialRampToValueAtTime(0.9,now+0.01);
+    gB.gain.exponentialRampToValueAtTime(0.0001,now+0.09);
+    beep.connect(gB).connect(master); beep.start(now); beep.stop(now+0.1);
+    // クリック（60ms）
+    const clk=actx.createOscillator(), gC=actx.createGain();
+    clk.type='triangle'; clk.frequency.setValueAtTime(2000,now+0.09); clk.frequency.exponentialRampToValueAtTime(700,now+0.15);
+    gC.gain.setValueAtTime(0.0001,now+0.09); gC.gain.exponentialRampToValueAtTime(1.0,now+0.095);
+    gC.gain.exponentialRampToValueAtTime(0.0001,now+0.17);
+    clk.connect(gC).connect(master); clk.start(now+0.09); clk.stop(now+0.18);
+    // ノイズ（140ms）
+    const durN=0.14, buf=actx.createBuffer(1,Math.ceil(actx.sampleRate*durN),actx.sampleRate);
+    const ch=buf.getChannelData(0); for(let i=0;i<ch.length;i++) ch[i]=(Math.random()*2-1)*0.7;
+    const noise=actx.createBufferSource(); noise.buffer=buf;
+    const bp=actx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=1.0;
+    const hp=actx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=500;
+    const gN=actx.createGain(); gN.gain.setValueAtTime(0.0001,now+0.09);
+    gN.gain.exponentialRampToValueAtTime(0.9,now+0.10); gN.gain.exponentialRampToValueAtTime(0.0001,now+0.22);
+    noise.connect(bp).connect(hp).connect(gN).connect(master); noise.start(now+0.09); noise.stop(now+0.23);
+    // 低音（120ms）
+    const low=actx.createOscillator(), gL=actx.createGain();
+    low.type='sine'; low.frequency.setValueAtTime(140,now+0.13);
+    gL.gain.setValueAtTime(0.0001,now+0.13); gL.gain.exponentialRampToValueAtTime(0.6,now+0.135);
+    gL.gain.exponentialRampToValueAtTime(0.0001,now+0.26);
+    low.connect(gL).connect(master); low.start(now+0.13); low.stop(now+0.27);
+  }
+  async function playShutter(){
+    try{ await ensureAudioUnlocked(); playShutterStrong(); return; }catch(_){}
+    try{ shutterAudio.currentTime=0; await shutterAudio.play(); return; }catch(_){}
+    if(navigator.vibrate) navigator.vibrate(40);
+  }
+  function primeAudioOnce(){
+    if(audioUnlocked) return; audioUnlocked=true; ensureAudioUnlocked();
+    const btn=document.getElementById('audioUnlock'); btn.style.pointerEvents='auto';
+    setTimeout(()=>{btn.style.pointerEvents='none'},0);
+  }
+  window.addEventListener('touchstart', primeAudioOnce, { once:true, passive:true });
+  window.addEventListener('mousedown', primeAudioOnce, { once:true });
 
-    // 2) WebAudio（合成で「ピッ→カシャッ」を作る）
-    let actx = null, audioUnlocked = false;
-    async function ensureAudioUnlocked(){
-      try{
-        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-        if(actx.state === 'suspended') await actx.resume();
-        audioUnlocked = true;
-      }catch(_){}
-    }
-    function playShutterStrong(){
-      if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      const now = actx.currentTime;
-      const master = actx.createGain();
-      master.gain.value = SHUTTER_VOLUME;
-      master.connect(actx.destination);
+  /* ===== 各種UI操作 ===== */
+  $('#pickBtn').onclick=()=>pickInput.click();
+  $('#camBtn').onclick =()=>openCameraOrFallback();
+  $('#clearBtn').onclick=()=>{queue.length=0;render();};
 
-      // ピッ（焦点合図）80ms
-      const beep = actx.createOscillator();
-      const gBeep = actx.createGain();
-      beep.type = 'sine';
-      beep.frequency.setValueAtTime(880, now);
-      gBeep.gain.setValueAtTime(0.0001, now);
-      gBeep.gain.exponentialRampToValueAtTime(0.9, now + 0.01);
-      gBeep.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-      beep.connect(gBeep).connect(master);
-      beep.start(now);
-      beep.stop(now + 0.1);
+  pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
+  cameraFile.addEventListener('change',e=>{ if(e.target.files[0]) queue.push(e.target.files[0]); e.target.value=''; render(); });
 
-      // カシャ（クリック＋ノイズ＋低音）
-      // クリック音（周波数スイープ 2k→700Hz / 60ms）
-      const click = actx.createOscillator();
-      const gClick = actx.createGain();
-      click.type = 'triangle';
-      click.frequency.setValueAtTime(2000, now + 0.09);
-      click.frequency.exponentialRampToValueAtTime(700, now + 0.15);
-      gClick.gain.setValueAtTime(0.0001, now + 0.09);
-      gClick.gain.exponentialRampToValueAtTime(1.0, now + 0.095);
-      gClick.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
-      click.connect(gClick).connect(master);
-      click.start(now + 0.09);
-      click.stop(now + 0.18);
-
-      // ノイズ（シャッター羽根）140ms
-      const durN = 0.14;
-      const noiseBuf = actx.createBuffer(1, Math.ceil(actx.sampleRate * durN), actx.sampleRate);
-      const ch = noiseBuf.getChannelData(0);
-      for (let i=0;i<ch.length;i++) ch[i] = (Math.random()*2 - 1)*0.7;
-      const noise = actx.createBufferSource(); noise.buffer = noiseBuf;
-      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2000; bp.Q.value = 1.0;
-      const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500;
-      const gNoise = actx.createGain();
-      gNoise.gain.setValueAtTime(0.0001, now + 0.09);
-      gNoise.gain.exponentialRampToValueAtTime(0.9, now + 0.10);
-      gNoise.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-      noise.connect(bp).connect(hp).connect(gNoise).connect(master);
-      noise.start(now + 0.09);
-      noise.stop(now + 0.23);
-
-      // 低音トン（メカ衝撃）120ms @140Hz
-      const th = actx.createOscillator();
-      const gTh = actx.createGain();
-      th.type = 'sine';
-      th.frequency.setValueAtTime(140, now + 0.13);
-      gTh.gain.setValueAtTime(0.0001, now + 0.13);
-      gTh.gain.exponentialRampToValueAtTime(0.6, now + 0.135);
-      gTh.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
-      th.connect(gTh).connect(master);
-      th.start(now + 0.13);
-      th.stop(now + 0.27);
-    }
-    async function playShutter(){
-      try{
-        await ensureAudioUnlocked();
-        playShutterStrong();
-        return;
-      }catch(_){ /* fallthrough */ }
-      try{
-        shutterAudio.currentTime = 0;
-        await shutterAudio.play();
-        return;
-      }catch(_){}
-      if (navigator.vibrate) navigator.vibrate(40);
-    }
-
-    // 初回タップでオーディオを確実にアンロック
-    function primeAudioOnce(){
-      if (audioUnlocked) return;
-      audioUnlocked = true;
-      ensureAudioUnlocked();
-      const unlockBtn = document.getElementById('audioUnlock');
-      unlockBtn.style.pointerEvents = 'auto';
-      setTimeout(() => { unlockBtn.style.pointerEvents = 'none'; }, 0);
-    }
-    window.addEventListener('touchstart', primeAudioOnce, { once:true, passive:true });
-    window.addEventListener('mousedown', primeAudioOnce, { once:true });
-
-    // ===== 追加ボタン =====
-    $('#pickBtn').onclick=()=>pickInput.click();
-    $('#camBtn').onclick =()=>openCameraOrFallback();
-    $('#clearBtn').onclick=()=>{queue.length=0;render();};
-
-    pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
-    cameraFile.addEventListener('change',e=>{ if(e.target.files[0]) queue.push(e.target.files[0]); e.target.value=''; render(); });
-
-    // カメラ（getUserMedia）
-    async function openCameraOrFallback(){
-      if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
-      try{
-        camStream = await navigator.mediaDevices.getUserMedia({
-          video:{ facingMode:{ideal:'environment'} }, audio:false
-        });
-        camVideo.srcObject=camStream;
-        camModal.classList.add('show');
-        camModal.setAttribute('aria-hidden','false');
-        document.body.style.overflow='hidden';
-        camAdded=0;
-        updateShotBadge();
-      }catch(e){
-        cameraFile.click();
-      }
-    }
-    function stopCamera(){
-      if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
-      camVideo.srcObject=null;
-      camModal.classList.remove('show');
-      camModal.setAttribute('aria-hidden','true');
-      document.body.style.overflow='';
+  /* ===== カメラ起動 ===== */
+  async function openCameraOrFallback(){
+    if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
+    try{
+      camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'} }, audio:false });
+      camVideo.srcObject=camStream;
+      // 動画メタ読み込み完了を待つ（iOS対策）
+      if (camVideo.readyState < 2) await new Promise(ok => camVideo.addEventListener('loadeddata', ok, {once:true}));
+      camModal.classList.add('show');
+      camModal.setAttribute('aria-hidden','false');
+      document.body.style.overflow='hidden';
       camAdded=0; updateShotBadge();
+    }catch(e){ cameraFile.click(); }
+  }
+  function stopCamera(){
+    if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+    camVideo.srcObject=null;
+    camModal.classList.remove('show');
+    camModal.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+    camAdded=0; updateShotBadge();
+  }
+  camClose.onclick=()=>{ stopCamera(); render(); };
+
+  /* ====== 互換ヘルパ ====== */
+  async function blobFromCanvas(canvas, mime='image/jpeg', quality=0.92){
+    if (canvas.toBlob){
+      const b = await new Promise(res=>canvas.toBlob(res, mime, quality));
+      if (b) return b;
     }
-    camClose.onclick=()=>{ stopCamera(); render(); };
+    // toBlobが無い/失敗 → dataURL → Blob
+    const dataUrl = canvas.toDataURL(mime, quality);
+    try{ return await (await fetch(dataUrl)).blob(); }
+    catch(_){
+      const b64 = dataUrl.split(',')[1]||''; const bin=atob(b64);
+      const u8 = new Uint8Array(bin.length); for(let i=0;i<u8.length;i++) u8[i]=bin.charCodeAt(i);
+      return new Blob([u8],{type:mime});
+    }
+  }
+  function toFileLike(blob, name){
+    try{ return new File([blob], name, { type: blob.type||'image/jpeg' }); }
+    catch(_){
+      // File未対応 → Blobにnameを付与してFile相当で扱う
+      try{ Object.defineProperty(blob,'name',{value:name}); }catch(__){}
+      return blob;
+    }
+  }
 
-    // 連続撮影：閉じずに queue へ追加 & バッジ更新 & 強化シャッター音
-    camShot.onclick=async ()=>{
-      if(!camStream) return;
-      try{
-        const track=camStream.getVideoTracks()[0];
-        const s=track.getSettings?track.getSettings():{};
-        const w=s.width||camVideo.videoWidth||1280, h=s.height||camVideo.videoHeight||720;
-        const c=document.createElement('canvas'); c.width=w; c.height=h;
-        c.getContext('2d').drawImage(camVideo,0,0,w,h);
-        const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
-        const d=new Date(), z=n=>String(n).padStart(2,'0');
-        const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
+  /* ===== 連続撮影 ===== */
+  camShot.onclick=async ()=>{
+    if(!camStream) return;
+    try{
+      const track = camStream.getVideoTracks()[0];
+      const s = track?.getSettings?.() || {};
+      let w = camVideo.videoWidth || s.width || 1280;
+      let h = camVideo.videoHeight || s.height || 720;
+      if (!w || !h) { w=1280; h=720; } // ゼロ対策
 
-        // 先に音（体感が良い）
-        await playShutter();
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(camVideo,0,0,w,h);
+      const blob = await blobFromCanvas(c, 'image/jpeg', 0.92);
 
-        queue.push(new File([blob],name,{type:'image/jpeg'}));
-        camAdded++;
-        updateShotBadge();
-        showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
-      }catch(_){
-        if (navigator.vibrate) navigator.vibrate(30);
-      }
-    };
+      // 音を先に（体感よく）
+      await playShutter();
 
-    function updateShotBadge(){
-      if (!shotBadge) return;
-      shotBadge.hidden = camAdded <= 0;
-      if (camAdded > 0) shotBadge.textContent = camAdded;
+      const d=new Date(), z=n=>String(n).padStart(2,'0');
+      const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
+
+      const fileLike = toFileLike(blob, name);
+      queue.push(fileLike);
+      camAdded++; updateShotBadge();
+      showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
+      render();
+    }catch(err){
+      showToast('⚠️ 撮影の追加に失敗しました。端末のカメラ権限やブラウザを確認してください。');
+      if (navigator.vibrate) navigator.vibrate(30);
+      console.error(err);
+    }
+  };
+
+  function updateShotBadge(){
+    shotBadge.hidden = camAdded <= 0;
+    if (camAdded > 0) shotBadge.textContent = camAdded;
+  }
+
+  function showToast(msg){
+    toast.textContent=msg;
+    toast.classList.remove('show');
+    requestAnimationFrame(()=>{ toast.classList.add('show'); });
+  }
+
+  /* ===== 画面更新 ===== */
+  function render(){
+    thumbs.innerHTML='';
+    if(queue.length>0) doneBox.classList.remove('show');
+    if(!queue.length){
+      precheck.className='msg msg-info';
+      precheck.textContent='選択されたファイルはありません。';
+      sendBtn.disabled=true; return;
     }
 
-    function showToast(msg){
-      toast.textContent=msg;
-      toast.classList.remove('show');
-      requestAnimationFrame(()=>{ toast.classList.add('show'); });
-    }
-
-    // 画面更新
-    function render(){
-      thumbs.innerHTML='';
-      if(queue.length>0) doneBox.classList.remove('show');
-      if(!queue.length){
-        precheck.className='msg msg-info';
-        precheck.textContent='選択されたファイルはありません。';
-        sendBtn.disabled=true; return;
-      }
-
-      queue.forEach((f,i)=>{
-        const card=document.createElement('div'); card.className='thumb';
-        const img=document.createElement('img');
-        if((f.type||'').startsWith('image/')){ img.src=URL.createObjectURL(f); img.onload=()=>URL.revokeObjectURL(img.src); }
-        else { img.alt='ファイル'; img.style.background='#eef3ff'; }
-        const meta=document.createElement('div'); meta.className='meta';
-        meta.innerHTML=`<div class="row"><strong>${escapeHtml(f.name)}</strong></div>
-                        <div class="row"><span>${(f.size/1024/1024).toFixed(1)} MB</span>
-                        <button type="button" class="remove" data-i="${i}">削除</button></div>`;
-        card.appendChild(img); card.appendChild(meta); thumbs.appendChild(card);
-      });
-      document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
-
-      const overs=queue.filter(f=>f.size>MAX_BYTES);
-      if(overs.length){
-        precheck.className='msg msg-bad';
-        precheck.innerHTML=`⚠ 上限<strong>${Math.round(MAX_BYTES/1024/1024)}MB</strong>を超えています：<br>${
-          overs.map(f=>`${escapeHtml(f.name)}（${(f.size/1024/1024).toFixed(1)}MB）`).join('、 ')
-        }`; sendBtn.disabled=true; return;
-      }
-      if(queue.some(f=>!ALLOW_MIME.includes((f.type||'').toLowerCase()))){
-        precheck.className='msg msg-bad';
-        precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。';
-        sendBtn.disabled=true; return;
-      }
-
-      const sum=queue.reduce((s,f)=>s+f.size,0);
-      precheck.className='msg msg-ok';
-      precheck.innerHTML=`👍 送信できます。選択枚数：<strong>${queue.length}</strong>、合計：約<strong>${(sum/1024/1024).toFixed(1)}MB</strong>`;
-      sendBtn.disabled=false;
-    }
-
-    // 送信
-    document.getElementById('f').addEventListener('submit',(e)=>{
-      e.preventDefault(); if(!queue.length) return;
-      (async ()=>{
-        sendBtn.disabled=true;
-        sending.style.display='block';
-        sending.scrollIntoView({behavior:'smooth', block:'start'});
-
-        const note = document.getElementById('note').value || '';
-
-        for (const f of queue){
-          try{
-            const packed = await toBase64WithOptionalResize(f);
-            if (packed.bytes > MAX_BYTES) continue;
-
-            const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
-            const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
-
-            await fetch(url, {
-              method:'POST',
-              headers:{'Content-Type':'text/plain'},
-              body:JSON.stringify(payload),
-              mode:'no-cors'
-            });
-          }catch(_){}
-        }
-
-        sending.style.display='none';
-        doneBox.classList.add('show');
-        queue.length=0; render();
-        sendBtn.disabled=false;
-      })();
+    queue.forEach((f,i)=>{
+      const card=document.createElement('div'); card.className='thumb';
+      const img=document.createElement('img');
+      if((f.type||'').startsWith('image/')){ img.src=URL.createObjectURL(f); img.onload=()=>URL.revokeObjectURL(img.src); }
+      else { img.alt='ファイル'; img.style.background='#eef3ff'; }
+      const displayName = (f.name || 'capture.jpg');
+      const meta=document.createElement('div'); meta.className='meta';
+      meta.innerHTML=`<div class="row"><strong>${escapeHtml(displayName)}</strong></div>
+                      <div class="row"><span>${(f.size/1024/1024).toFixed(1)} MB</span>
+                      <button type="button" class="remove" data-i="${i}">削除</button></div>`;
+      card.appendChild(img); card.appendChild(meta); thumbs.appendChild(card);
     });
+    document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
 
-    // 画像は 2000px に縮小
-    async function toBase64WithOptionalResize(file){
-      if((file.type||'').startsWith('image/')){
-        const dataUrl=await readFileAsDataURL(file);
-        const img=await loadImage(dataUrl);
-        const maxW=2000,maxH=2000, scale=Math.min(1,maxW/img.width,maxH/img.height);
-        let outUrl=dataUrl, mimeOut=(file.type==='image/png'?'image/png':'image/jpeg');
-        if(scale<1){
-          const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
-          c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-          outUrl=c.toDataURL(mimeOut,0.9);
-        }else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
-        const base64=outUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
-        return { base64, bytes, mime:mimeOut };
-      }else{
-        const dataUrl=await readFileAsDataURL(file);
-        const base64=dataUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
-        return { base64, bytes, mime:(file.type||'application/octet-stream') };
-      }
+    const overs=queue.filter(f=>f.size>MAX_BYTES);
+    if(overs.length){
+      precheck.className='msg msg-bad';
+      precheck.innerHTML=`⚠ 上限<strong>${Math.round(MAX_BYTES/1024/1024)}MB</strong>を超えています：<br>${
+        overs.map(f=>`${escapeHtml((f.name||'ファイル'))}（${(f.size/1024/1024).toFixed(1)}MB）`).join('、 ')
+      }`; sendBtn.disabled=true; return;
     }
-    function readFileAsDataURL(file){ return new Promise((ok,ng)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=ng; r.readAsDataURL(file); }); }
-    function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    if(queue.some(f=>!ALLOW_MIME.includes((f.type||'').toLowerCase()))){
+      precheck.className='msg msg-bad';
+      precheck.innerHTML='⚠ 送信できない形式が含まれています（jpeg / png / pdfのみ）。';
+      sendBtn.disabled=true; return;
+    }
 
-    render();
-  </script>
+    const sum=queue.reduce((s,f)=>s+f.size,0);
+    precheck.className='msg msg-ok';
+    precheck.innerHTML=`👍 送信できます。選択枚数：<strong>${queue.length}</strong>、合計：約<strong>${(sum/1024/1024).toFixed(1)}MB</strong>`;
+    sendBtn.disabled=false;
+  }
+
+  // 送信（既存のまま）
+  document.getElementById('f').addEventListener('submit',(e)=>{
+    e.preventDefault(); if(!queue.length) return;
+    (async ()=>{
+      sendBtn.disabled=true;
+      sending.style.display='block';
+      sending.scrollIntoView({behavior:'smooth', block:'start'});
+
+      const note = document.getElementById('note').value || '';
+
+      for (const f of queue){
+        try{
+          const packed = await toBase64WithOptionalResize(f);
+          if (packed.bytes > MAX_BYTES) continue;
+
+          const payload = { note, items:[{ name:(f.name||'capture.jpg'), mime:packed.mime, base64:packed.base64 }] };
+          const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
+
+          await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload), mode:'no-cors' });
+        }catch(_){}
+      }
+
+      sending.style.display='none';
+      doneBox.classList.add('show');
+      queue.length=0; render();
+      sendBtn.disabled=false;
+    })();
+  });
+
+  // 画像は 2000px に縮小
+  async function toBase64WithOptionalResize(file){
+    if((file.type||'').startsWith('image/')){
+      const dataUrl=await readFileAsDataURL(file);
+      const img=await loadImage(dataUrl);
+      const maxW=2000,maxH=2000, scale=Math.min(1,maxW/img.width,maxH/img.height);
+      let outUrl=dataUrl, mimeOut=(file.type==='image/png'?'image/png':'image/jpeg');
+      if(scale<1){
+        const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        outUrl=c.toDataURL(mimeOut,0.9);
+      }else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
+      const base64=outUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
+      return { base64, bytes, mime:mimeOut };
+    }else{
+      const dataUrl=await readFileAsDataURL(file);
+      const base64=dataUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
+      return { base64, bytes, mime:(file.type||'application/octet-stream') };
+    }
+  }
+  function readFileAsDataURL(file){ return new Promise((ok,ng)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=ng; r.readAsDataURL(file); }); }
+  function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // 初期描画
+  render();
+</script>
 </body>
 </html>
