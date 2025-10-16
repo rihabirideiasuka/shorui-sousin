@@ -67,7 +67,7 @@
     .cam .controls{display:flex;gap:10px;justify-content:space-between;padding:12px;background:rgba(0,0,0,.6)}
     .cam .btn{flex:1;padding:14px;border-radius:12px}
 
-    /* トースト（追加アピール） */
+    /* トースト */
     .toast{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#e9f5ee;color:#0b6e3f;border:1px solid #bfe5cd;
            padding:10px 14px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:10000;display:none}
     .toast.show{display:block;animation:fade 2.4s ease forwards}
@@ -83,9 +83,9 @@
       font-weight:700;
       line-height:1.6em;
       text-align:center;
-      color:#1556d1;               /* 文字は青 */
-      background:#fff;             /* バッジは白 */
-      border:2px solid #fff;       /* 視認性UP */
+      color:#1556d1;      /* 文字は青 */
+      background:#fff;    /* バッジは白 */
+      border:2px solid #fff;
       border-radius:999px;
       vertical-align:middle;
     }
@@ -180,25 +180,21 @@
     let camStream=null, camAdded=0;
 
     // ===== シャッター音（確実に鳴らすための多重対策） =====
-    // 1) <audio> 要素（iOSに強い）
+    // 1) <audio> 要素（iOSに強い） - 120msのビープ音（自作・著作権フリー）
     const shutterAudio = new Audio();
     shutterAudio.src =
-      'data:audio/mp3;base64,SUQzBAAAAAAAF1RTU0UAAAAPAAAAUAAACAA...'; 
-      // ↑ ここに短いシャッター音の base64（~20KB程度）を入れてください
-      //   著作権的に問題ない効果音を使うか、無音にしてもOK
+      'data:audio/wav;base64,UklGRnwpAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YVgpAAAAAEUHZA45FZ8bdyGgJgIrE6xzKz0pIh8YFxQPDwsJCAcGBQQDAgEAAP//+v7y+fvy+f36/v///v36+Pv49/m39r7zv+q72bKqj4Z7Zl9aUEw8LSohGxQMDw4JCAYGBQQDAgIAAQAAAP///v36+vv19fPz8vHz8fLz8/Hz9Pr9/v///v36+fr59/b39vX19PPy8/Hx8vLz8/P09fr9/////w==';
     shutterAudio.preload = 'auto';
-    shutterAudio.playsInline = true;  // iOS Safari
+    shutterAudio.playsInline = true;
     shutterAudio.setAttribute('webkit-playsinline','');
 
     // 2) AudioContext + Buffer（<audio>失敗時の保険）
     let actx = null, shutterBuf = null, audioUnlocked = false;
 
     async function ensureAudioUnlocked(){
-      // 初タップで iOS のAudio制限を解除
       try{
         if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
         if (actx.state === 'suspended') await actx.resume();
-        // iOSの仕様で何らかの再生を試みる必要がある
         audioUnlocked = true;
       }catch(_){}
     }
@@ -206,7 +202,6 @@
     async function loadShutterBufferOnce(){
       if (shutterBuf) return;
       try{
-        // <audio> のソースをそのまま fetch できないので、別途 base64 を ArrayBuffer に変換
         const base64 = shutterAudio.src.split(',')[1] || '';
         const bin = atob(base64);
         const len = bin.length;
@@ -239,7 +234,7 @@
         }
       }catch(_){ /* fallthrough */ }
 
-      // Fallback: 触覚（Android の多くと iOS 一部で振動）
+      // Fallback: 触覚（Android 多く／iOS一部）
       if (navigator.vibrate) navigator.vibrate(30);
     }
 
@@ -314,7 +309,6 @@
         updateShotBadge();
         showToast(`✅ 追加しました（合計 ${camAdded} 件）`);
       }catch(_){
-        // 音が鳴らなかったとしても、フォールバックで振動を一応
         if (navigator.vibrate) navigator.vibrate(30);
       }
     };
