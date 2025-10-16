@@ -26,14 +26,12 @@
     label{display:block;font-weight:600;margin:14px 0 6px}
     input[type="text"]{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:14px;font-size:16px}
 
-    /* ===== ボタン ===== */
     .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;cursor:pointer;transition:transform .02s ease}
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--primary);color:#fff}
     .btn-danger{background:var(--danger);color:#fff}
     .btn[disabled]{opacity:.6;cursor:not-allowed}
 
-    /* 2つの青ボタンを等幅に */
     .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
     .btn-bar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
 
@@ -59,7 +57,7 @@
     .done{display:none;margin-top:14px}.done.show{display:block}
     .done h2{margin:0 0 6px;font-size:22px}
 
-    /* ===== カメラ全画面＆連続撮影 ===== */
+    /* カメラ */
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:0;z-index:9999}
     .modal.show{display:flex}
     .cam{background:#000;width:100%;max-width:1000px;color:#fff;display:flex;flex-direction:column;height:100svh}
@@ -73,23 +71,12 @@
     .toast.show{display:block;animation:fade 2.4s ease forwards}
     @keyframes fade{0%{opacity:0;transform:translate(-50%,-6px)}10%{opacity:1;transform:translate(-50%,0)}90%{opacity:1}100%{opacity:0}}
 
-    /* 撮影ボタンの枚数バッジ */
+    /* 枚数バッジ */
     .badge{
-      display:inline-block;
-      min-width:1.6em;
-      padding:0 .45em;
-      margin-left:.5em;
-      font-size:.85em;
-      font-weight:700;
-      line-height:1.6em;
-      text-align:center;
-      color:#1556d1;      /* 文字は青 */
-      background:#fff;    /* バッジは白 */
-      border:2px solid #fff;
-      border-radius:999px;
-      vertical-align:middle;
+      display:inline-block;min-width:1.6em;padding:0 .45em;margin-left:.5em;font-size:.85em;font-weight:700;line-height:1.6em;
+      text-align:center;color:#1556d1;background:#fff;border:2px solid #fff;border-radius:999px;vertical-align:middle;
     }
-    .badge[hidden]{ display:none; }
+    .badge[hidden]{display:none}
   </style>
 </head>
 <body>
@@ -103,14 +90,13 @@
 
         <label>写真・PDF</label>
 
-        <!-- 等幅の2ボタン -->
         <div class="btn-row">
           <button type="button" class="btn btn-primary" id="pickBtn">📁 アルバムから写真を選択して送る</button>
           <button type="button" class="btn btn-primary" id="camBtn">📸 写真を撮影して送る</button>
         </div>
         <div class="mini">※ カメラは「撮影して追加」後も続けて撮影できます</div>
 
-        <!-- ファイル input は隠す -->
+        <!-- 非表示 inputs -->
         <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
         <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
 
@@ -139,7 +125,7 @@
     </div>
   </div>
 
-  <!-- カメラモーダル（連続撮影OK） -->
+  <!-- カメラモーダル -->
   <div id="camModal" class="modal" aria-hidden="true">
     <div class="cam" role="dialog" aria-label="カメラで撮影">
       <video id="camVideo" autoplay playsinline></video>
@@ -152,10 +138,10 @@
     </div>
   </div>
 
-  <!-- 追加アピール用トースト -->
+  <!-- トースト -->
   <div id="toast" class="toast">✅ 追加しました</div>
 
-  <!-- iOSでの自動再生対策：初回タップでアンロックするための透明ボタン（視覚非表示） -->
+  <!-- iOSの初回再生制限対策（透明ボタン） -->
   <button id="audioUnlock" style="position:fixed;inset:0;opacity:0;pointer-events:none;border:0;background:transparent"></button>
 
   <script>
@@ -179,63 +165,102 @@
     const shotBadge = document.getElementById('shotBadge');
     let camStream=null, camAdded=0;
 
-    // ===== シャッター音（確実に鳴らすための多重対策） =====
-    // 1) <audio> 要素（iOSに強い） - 120msのビープ音（自作・著作権フリー）
-    const shutterAudio = new Audio();
-    shutterAudio.src =
-      'data:audio/wav;base64,UklGRnwpAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YVgpAAAAAEUHZA45FZ8bdyGgJgIrE6xzKz0pIh8YFxQPDwsJCAcGBQQDAgEAAP//+v7y+fvy+f36/v///v36+Pv49/m39r7zv+q72bKqj4Z7Zl9aUEw8LSohGxQMDw4JCAYGBQQDAgIAAQAAAP///v36+vv19fPz8vHz8fLz8/Hz9Pr9/v///v36+fr59/b39vX19PPy8/Hx8vLz8/P09fr9/////w==';
+    // ====== サウンド設定 ======
+    const SHUTTER_VOLUME = 1.0; // 0.0〜1.0（大きいほど音量大）
+    // フォールバック用：はっきり大きめの短い音（WAV, ~3KB）
+    const FALLBACK_WAV_BASE64 =
+      'UklGRm0XAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YUsXAACAgIDAwMDw8PD4+Pj9/f3////7+/v39/fz8/Pr6+vj4+Pf39/v7+/wAAAP39/fj4+Pr6+vz8/P/////7+/v39/f4+Pj5+fn7+/v9/f0AAAABAQEBAgICAwMDAwQEBAUFBQYGBgcHBwgICAkJCQoKCgoLCwsMDQ0NDg4ODw8PEBAQERER'
+      + 'EhISExMTFhYWFxcXGBgYGRkZGhoaGxsbHBwcHR0dHh4eHx8fICAgISEhIiIiIyMjJCQkJSUlJiYmJycnKioqKysrLCwsLS0tLi4uLy8v';
+
+    // 1) <audio> フォールバック
+    const shutterAudio = new Audio('data:audio/wav;base64,' + FALLBACK_WAV_BASE64);
     shutterAudio.preload = 'auto';
     shutterAudio.playsInline = true;
     shutterAudio.setAttribute('webkit-playsinline','');
+    shutterAudio.volume = SHUTTER_VOLUME;
 
-    // 2) AudioContext + Buffer（<audio>失敗時の保険）
-    let actx = null, shutterBuf = null, audioUnlocked = false;
-
+    // 2) WebAudio（合成で「ピッ→カシャッ」を作る）
+    let actx = null, audioUnlocked = false;
     async function ensureAudioUnlocked(){
       try{
         if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-        if (actx.state === 'suspended') await actx.resume();
+        if(actx.state === 'suspended') await actx.resume();
         audioUnlocked = true;
       }catch(_){}
     }
+    function playShutterStrong(){
+      if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = actx.currentTime;
+      const master = actx.createGain();
+      master.gain.value = SHUTTER_VOLUME;
+      master.connect(actx.destination);
 
-    async function loadShutterBufferOnce(){
-      if (shutterBuf) return;
-      try{
-        const base64 = shutterAudio.src.split(',')[1] || '';
-        const bin = atob(base64);
-        const len = bin.length;
-        const buf = new Uint8Array(len);
-        for(let i=0;i<len;i++) buf[i] = bin.charCodeAt(i);
-        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-        shutterBuf = await actx.decodeAudioData(buf.buffer);
-      }catch(_){}
+      // ピッ（焦点合図）80ms
+      const beep = actx.createOscillator();
+      const gBeep = actx.createGain();
+      beep.type = 'sine';
+      beep.frequency.setValueAtTime(880, now);
+      gBeep.gain.setValueAtTime(0.0001, now);
+      gBeep.gain.exponentialRampToValueAtTime(0.9, now + 0.01);
+      gBeep.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+      beep.connect(gBeep).connect(master);
+      beep.start(now);
+      beep.stop(now + 0.1);
+
+      // カシャ（クリック＋ノイズ＋低音）
+      // クリック音（周波数スイープ 2k→700Hz / 60ms）
+      const click = actx.createOscillator();
+      const gClick = actx.createGain();
+      click.type = 'triangle';
+      click.frequency.setValueAtTime(2000, now + 0.09);
+      click.frequency.exponentialRampToValueAtTime(700, now + 0.15);
+      gClick.gain.setValueAtTime(0.0001, now + 0.09);
+      gClick.gain.exponentialRampToValueAtTime(1.0, now + 0.095);
+      gClick.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
+      click.connect(gClick).connect(master);
+      click.start(now + 0.09);
+      click.stop(now + 0.18);
+
+      // ノイズ（シャッター羽根）140ms
+      const durN = 0.14;
+      const noiseBuf = actx.createBuffer(1, Math.ceil(actx.sampleRate * durN), actx.sampleRate);
+      const ch = noiseBuf.getChannelData(0);
+      for (let i=0;i<ch.length;i++) ch[i] = (Math.random()*2 - 1)*0.7;
+      const noise = actx.createBufferSource(); noise.buffer = noiseBuf;
+      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2000; bp.Q.value = 1.0;
+      const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500;
+      const gNoise = actx.createGain();
+      gNoise.gain.setValueAtTime(0.0001, now + 0.09);
+      gNoise.gain.exponentialRampToValueAtTime(0.9, now + 0.10);
+      gNoise.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      noise.connect(bp).connect(hp).connect(gNoise).connect(master);
+      noise.start(now + 0.09);
+      noise.stop(now + 0.23);
+
+      // 低音トン（メカ衝撃）120ms @140Hz
+      const th = actx.createOscillator();
+      const gTh = actx.createGain();
+      th.type = 'sine';
+      th.frequency.setValueAtTime(140, now + 0.13);
+      gTh.gain.setValueAtTime(0.0001, now + 0.13);
+      gTh.gain.exponentialRampToValueAtTime(0.6, now + 0.135);
+      gTh.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
+      th.connect(gTh).connect(master);
+      th.start(now + 0.13);
+      th.stop(now + 0.27);
     }
-
     async function playShutter(){
-      // try #1: <audio> を先頭から鳴らす
+      try{
+        await ensureAudioUnlocked();
+        playShutterStrong();
+        return;
+      }catch(_){ /* fallthrough */ }
       try{
         shutterAudio.currentTime = 0;
         await shutterAudio.play();
         return;
-      }catch(_){ /* fallthrough */ }
-
-      // try #2: WebAudio
-      try{
-        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-        if(actx.state === 'suspended') await actx.resume();
-        await loadShutterBufferOnce();
-        if(shutterBuf){
-          const src = actx.createBufferSource();
-          src.buffer = shutterBuf;
-          src.connect(actx.destination);
-          src.start(0);
-          return;
-        }
-      }catch(_){ /* fallthrough */ }
-
-      // Fallback: 触覚（Android 多く／iOS一部）
-      if (navigator.vibrate) navigator.vibrate(30);
+      }catch(_){}
+      if (navigator.vibrate) navigator.vibrate(40);
     }
 
     // 初回タップでオーディオを確実にアンロック
@@ -243,7 +268,6 @@
       if (audioUnlocked) return;
       audioUnlocked = true;
       ensureAudioUnlocked();
-      // 見えないボタンに一瞬 focus を与えてユーザー操作扱いを強化（iOS対策）
       const unlockBtn = document.getElementById('audioUnlock');
       unlockBtn.style.pointerEvents = 'auto';
       setTimeout(() => { unlockBtn.style.pointerEvents = 'none'; }, 0);
@@ -256,11 +280,10 @@
     $('#camBtn').onclick =()=>openCameraOrFallback();
     $('#clearBtn').onclick=()=>{queue.length=0;render();};
 
-    // 選択イベント
     pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
     cameraFile.addEventListener('change',e=>{ if(e.target.files[0]) queue.push(e.target.files[0]); e.target.value=''; render(); });
 
-    // ===== カメラ（getUserMedia） =====
+    // カメラ（getUserMedia）
     async function openCameraOrFallback(){
       if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
       try{
@@ -274,7 +297,6 @@
         camAdded=0;
         updateShotBadge();
       }catch(e){
-        // 権限拒否・非対応 → 端末のカメラUIにフォールバック
         cameraFile.click();
       }
     }
@@ -288,7 +310,7 @@
     }
     camClose.onclick=()=>{ stopCamera(); render(); };
 
-    // 連続撮影：閉じずに queue に追加 & トースト & バッジ & シャッター
+    // 連続撮影：閉じずに queue へ追加 & バッジ更新 & 強化シャッター音
     camShot.onclick=async ()=>{
       if(!camStream) return;
       try{
@@ -301,7 +323,7 @@
         const d=new Date(), z=n=>String(n).padStart(2,'0');
         const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
 
-        // シャッター音（先に鳴らすと体感が良い）
+        // 先に音（体感が良い）
         await playShutter();
 
         queue.push(new File([blob],name,{type:'image/jpeg'}));
@@ -315,12 +337,8 @@
 
     function updateShotBadge(){
       if (!shotBadge) return;
-      if (camAdded > 0){
-        shotBadge.textContent = camAdded;
-        shotBadge.hidden = false;
-      } else {
-        shotBadge.hidden = true;
-      }
+      shotBadge.hidden = camAdded <= 0;
+      if (camAdded > 0) shotBadge.textContent = camAdded;
     }
 
     function showToast(msg){
@@ -329,7 +347,7 @@
       requestAnimationFrame(()=>{ toast.classList.add('show'); });
     }
 
-    // ===== 画面更新 =====
+    // 画面更新
     function render(){
       thumbs.innerHTML='';
       if(queue.length>0) doneBox.classList.remove('show');
@@ -371,7 +389,7 @@
       sendBtn.disabled=false;
     }
 
-    // ===== 送信（件数は表示しない簡潔版） =====
+    // 送信
     document.getElementById('f').addEventListener('submit',(e)=>{
       e.preventDefault(); if(!queue.length) return;
       (async ()=>{
@@ -389,14 +407,13 @@
             const payload = { note, items:[{ name:f.name, mime:packed.mime, base64:packed.base64 }] };
             const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
 
-            // CORSの煩雑さを避けるため no-cors（成功/失敗の詳細は見ない）
             await fetch(url, {
               method:'POST',
               headers:{'Content-Type':'text/plain'},
               body:JSON.stringify(payload),
               mode:'no-cors'
             });
-          }catch(_){ /* 失敗しても黙る */ }
+          }catch(_){}
         }
 
         sending.style.display='none';
@@ -430,7 +447,6 @@
     function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-    // 初期描画
     render();
   </script>
 </body>
