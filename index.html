@@ -227,7 +227,15 @@
   async function openCameraOrFallback(){
     if(!navigator.mediaDevices?.getUserMedia){ cameraFile.click(); return; }
     try{
-      camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'} }, audio:false });
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 4032 },
+          height: { ideal: 3024 },
+          advanced: [{ width: 4032, height: 3024 }]
+        },
+        audio: false
+      });
       camVideo.srcObject=camStream;
       // 動画メタ読み込み完了を待つ（iOS対策）
       if (camVideo.readyState < 2) await new Promise(ok => camVideo.addEventListener('loadeddata', ok, {once:true}));
@@ -416,5 +424,6 @@
 </script>
 </body>
 </html>
+
 
 
