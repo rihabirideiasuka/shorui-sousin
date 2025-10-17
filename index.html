@@ -396,7 +396,7 @@
       if(scale<1){
         const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
         c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        outUrl=c.toDataURL(mimeOut,0.9);
+        outUrl=c.toDataURL(mimeOut,0.98);
       }else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
       const base64=outUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
       return { base64, bytes, mime:mimeOut };
@@ -415,3 +415,4 @@
 </script>
 </body>
 </html>
+
