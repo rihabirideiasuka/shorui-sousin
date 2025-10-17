@@ -21,7 +21,7 @@
   .btn-danger{background:var(--danger);color:#fff}
   .btn[disabled]{opacity:.6;cursor:not-allowed}
 
-  .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+  .btn-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0}
   .btn-bar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
 
   .hint{font-size:14px;color:var(--muted);margin:6px 0}
@@ -82,11 +82,9 @@
         <div class="btn-row">
           <button type="button" class="btn btn-primary" id="pickBtn">📁 アルバムから写真を選択して送る</button>
           <button type="button" class="btn btn-primary" id="camBtn">📸 写真を撮影して送る</button>
-          <!-- 既存の .btn-row 内に追加 -->
           <button type="button" class="btn" id="nativeCamBtn">📷 高画質（純正カメラ）</button>
-
         </div>
-        <div class="mini">※ カメラは「撮影して追加」後も続けて撮影できます</div>
+        <div class="mini">※ 大きい画像は送信時に自動的に最適化します（PNGは透過保持）。</div>
 
         <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
         <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
@@ -221,6 +219,7 @@
   /* ===== 各種UI操作 ===== */
   $('#pickBtn').onclick=()=>pickInput.click();
   $('#camBtn').onclick =()=>openCameraOrFallback();
+  $('#nativeCamBtn').onclick = ()=>cameraFile.click(); // 高画質（純正カメラ）
   $('#clearBtn').onclick=()=>{queue.length=0;render();};
 
   pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
@@ -259,12 +258,11 @@
   camClose.onclick=()=>{ stopCamera(); render(); };
 
   /* ====== 互換ヘルパ ====== */
-  async function blobFromCanvas(canvas, mime='image/jpeg', quality=0.92){
+  async function blobFromCanvas(canvas, mime='image/jpeg', quality=1.0){
     if (canvas.toBlob){
       const b = await new Promise(res=>canvas.toBlob(res, mime, quality));
       if (b) return b;
     }
-    // toBlobが無い/失敗 → dataURL → Blob
     const dataUrl = canvas.toDataURL(mime, quality);
     try{ return await (await fetch(dataUrl)).blob(); }
     catch(_){
@@ -276,19 +274,17 @@
   function toFileLike(blob, name){
     try{ return new File([blob], name, { type: blob.type||'image/jpeg' }); }
     catch(_){
-      // File未対応 → Blobにnameを付与してFile相当で扱う
       try{ Object.defineProperty(blob,'name',{value:name}); }catch(__){}
       return blob;
     }
   }
 
-   // 追加：最高品質スナップ関数
+  // ImageCapture優先スナップ（失敗時canvas）
   async function camSnapBest() {
     const track = camStream?.getVideoTracks?.()[0];
     if (track && 'ImageCapture' in window) {
       try {
         const ic = new ImageCapture(track);
-        // 取れるなら最大解像度指定
         let settings = {};
         if (ic.getPhotoCapabilities) {
           const cap = await ic.getPhotoCapabilities();
@@ -297,18 +293,16 @@
             settings.imageHeight = cap.imageHeight.max;
           }
         }
-        const blob = await ic.takePhoto(settings); // 多くの環境でEXIF保持＆高解像度
+        const blob = await ic.takePhoto(settings); // EXIF保持・高解像度に期待
         return blob;
-      } catch (_) { /* フォールバックへ */ }
+      } catch (_) { /* fallback */ }
     }
-    // フォールバック：動画フレーム→canvas（従来）
+    // fallback: プレビュー解像度で静止画化
     const s = track?.getSettings?.() || {};
     const w = camVideo.videoWidth || s.width || 1280;
     const h = camVideo.videoHeight || s.height || 720;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const ctx = c.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(camVideo, 0, 0, w, h);
     return await blobFromCanvas(c, 'image/jpeg', 1.0);
   }
@@ -317,16 +311,8 @@
   camShot.onclick=async ()=>{
     if(!camStream) return;
     try{
-      const track = camStream.getVideoTracks()[0];
-      const s = track?.getSettings?.() || {};
-      let w = camVideo.videoWidth || s.width || 1280;
-      let h = camVideo.videoHeight || s.height || 720;
-      if (!w || !h) { w=1280; h=720; } // ゼロ対策
-
-      const blob = await camSnapBest(); // ← まず本物の静止画を狙う（失敗時にcanvas）
-
-      // 音を先に（体感よく）
-      await playShutter();
+      const blob = await camSnapBest(); // まず本物の静止画を狙う
+      await playShutter(); // 音を先に（体感よく）
 
       const d=new Date(), z=n=>String(n).padStart(2,'0');
       const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
@@ -378,10 +364,11 @@
     });
     document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
 
-    const overs=queue.filter(f=>f.size>MAX_BYTES);
+    // 非画像のみ、25MB超なら弾く（画像は送信時に最適化）
+    const overs=queue.filter(f=>!(f.type||'').startsWith('image/') && f.size>MAX_BYTES);
     if(overs.length){
       precheck.className='msg msg-bad';
-      precheck.innerHTML=`⚠ 上限<strong>${Math.round(MAX_BYTES/1024/1024)}MB</strong>を超えています：<br>${
+      precheck.innerHTML=`⚠ 非画像ファイルが上限<strong>${Math.round(MAX_BYTES/1024/1024)}MB</strong>を超えています：<br>${
         overs.map(f=>`${escapeHtml((f.name||'ファイル'))}（${(f.size/1024/1024).toFixed(1)}MB）`).join('、 ')
       }`; sendBtn.disabled=true; return;
     }
@@ -393,11 +380,11 @@
 
     const sum=queue.reduce((s,f)=>s+f.size,0);
     precheck.className='msg msg-ok';
-    precheck.innerHTML=`👍 送信できます。選択枚数：<strong>${queue.length}</strong>、合計：約<strong>${(sum/1024/1024).toFixed(1)}MB</strong>`;
+    precheck.innerHTML=`👍 送信できます。選択枚数：<strong>${queue.length}</strong>、合計：約<strong>${(sum/1024/1024).toFixed(1)}MB</strong><div class="mini">※ 画像が25MB超の場合は送信時に自動最適化します。</div>`;
     sendBtn.disabled=false;
   }
 
-  // 送信（既存のまま）
+  // 送信
   document.getElementById('f').addEventListener('submit',(e)=>{
     e.preventDefault(); if(!queue.length) return;
     (async ()=>{
@@ -410,10 +397,8 @@
       for (const f of queue){
         try{
           const packed = await packToLimit(f, MAX_BYTES);
-
           const payload = { note, items:[{ name:(f.name||'capture.jpg'), mime:packed.mime, base64:packed.base64 }] };
           const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
-
           await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload), mode:'no-cors' });
         }catch(_){}
       }
@@ -425,75 +410,95 @@
     })();
   });
 
-  // 画像は 2000px に縮小
-  async function toBase64WithOptionalResize(file){
-    if((file.type||'').startsWith('image/')){
-      const dataUrl=await readFileAsDataURL(file);
-      const img=await loadImage(dataUrl);
-      // 例2: 縮小を無効化（常にオリジナル解像度）
-      const scale = 1;
-      let outUrl=dataUrl, mimeOut=(file.type==='image/png'?'image/png':'image/jpeg');
-      if(scale<1){
-        const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
-        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        outUrl=c.toDataURL(mimeOut,0.9);
-      }else if(!/^image\/(png|jpeg)$/i.test(file.type)){ mimeOut=file.type||'application/octet-stream'; }
-      const base64=outUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
-      return { base64, bytes, mime:mimeOut };
-    }else{
-      const dataUrl=await readFileAsDataURL(file);
-      const base64=dataUrl.split(',')[1], bytes=Math.ceil(base64.length*3/4);
-      return { base64, bytes, mime:(file.type||'application/octet-stream') };
-    }
-  }
+  /* ===== ユーティリティ ===== */
   function readFileAsDataURL(file){ return new Promise((ok,ng)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=ng; r.readAsDataURL(file); }); }
   function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  // 画像は 2000px に縮小
+  // 透過の有無をざっくり判定（高速サンプリング）
+  async function hasAlphaChannel(img){
+    const w = Math.min(img.width, 512), h = Math.min(img.height, 512);
+    const c = document.createElement('canvas'); c.width=w; c.height=h;
+    const ctx = c.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+    const data = ctx.getImageData(0,0,w,h).data;
+    for(let i=3; i<data.length; i+=16){ if(data[i] < 255) return true; }
+    return false;
+  }
+
+  // 25MB以内に収める最小限最適化（画像は品質優先、PNGは透過保持）
   async function packToLimit(file, maxBytes){
-   if(!((file.type||'').startsWith('image/'))) {
-     const dataUrl = await readFileAsDataURL(file);
-     const base64 = dataUrl.split(',')[1]; const bytes = Math.ceil(base64.length*3/4);
-     return { base64, bytes, mime:(file.type||'application/octet-stream') };
-   }
- 
-   // 25MBを超えそうな時だけ“最小限”で圧縮（品質は最大限キープ）
-   let dataUrl = await readFileAsDataURL(file);
-   let base64  = dataUrl.split(',')[1];
-   let bytes   = Math.ceil(base64.length*3/4);
-   if (bytes <= maxBytes) return { base64, bytes, mime:file.type };
- 
-   // 画像だけ最小限の再エンコード（バイナリサーチで品質調整）
-   const img = await loadImage(dataUrl);
-   let lo = 0.82, hi = 0.98, best = null;
-   for (let i=0; i<6; i++){
-     const q = (lo+hi)/2;
-     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-     c.getContext('2d').drawImage(img,0,0);
-     const out = c.toDataURL('image/jpeg', q);
-     const b64 = out.split(',')[1]; const b = Math.ceil(b64.length*3/4);
-     if (b <= maxBytes){ best = { base64:b64, bytes:b, mime:'image/jpeg' }; lo = q; } else { hi = q; }
-   }
-   if (best) return best;
- 
-   // まだ大きい → 少しだけ縮小してから 0.9 で書き出し
-   const ratio = Math.sqrt(maxBytes/bytes)*0.96; // 必要分だけ
-   const cw = Math.round(img.width*ratio), ch = Math.round(img.height*ratio);
-   const c2 = document.createElement('canvas'); c2.width = cw; c2.height = ch;
-   const ctx = c2.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-   ctx.drawImage(img,0,0,cw,ch);
-   const out2 = c2.toDataURL('image/jpeg', 0.9);
-   const b64_2 = out2.split(',')[1]; const b2 = Math.ceil(b64_2.length*3/4);
-   return { base64:b64_2, bytes:b2, mime:'image/jpeg' };
- }
+    if(!((file.type||'').startsWith('image/'))) {
+      const dataUrl = await readFileAsDataURL(file);
+      const base64 = dataUrl.split(',')[1]; const bytes = Math.ceil(base64.length*3/4);
+      return { base64, bytes, mime:(file.type||'application/octet-stream') };
+    }
+
+    // そのまま試す
+    let dataUrl = await readFileAsDataURL(file);
+    let base64  = dataUrl.split(',')[1];
+    let bytes   = Math.ceil(base64.length*3/4);
+    if (bytes <= maxBytes) return { base64, bytes, mime:file.type||'image/jpeg' };
+
+    const img = await loadImage(dataUrl);
+    const isPng = /^image\/png$/i.test(file.type||'');
+    const alpha = isPng ? await hasAlphaChannel(img) : false;
+
+    // JPEG系（またはアルファなし画像）はまず品質調整
+    if (!isPng || !alpha){
+      // バイナリサーチで品質だけ落としてみる（解像度維持）
+      let lo = 0.82, hi = 0.98, best = null;
+      for (let i=0; i<6; i++){
+        const q = (lo+hi)/2;
+        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+        const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality='high';
+        ctx.drawImage(img,0,0);
+        const out = c.toDataURL('image/jpeg', q);
+        const b64 = out.split(',')[1]; const b = Math.ceil(b64.length*3/4);
+        if (b <= maxBytes){ best = { base64:b64, bytes:b, mime:'image/jpeg' }; lo = q; } else { hi = q; }
+      }
+      if (best) return best;
+
+      // まだ大きい → 必要分だけ縮小して 0.9 で再出力
+      const ratio = Math.max(0.1, Math.sqrt(maxBytes/bytes)*0.96);
+      const cw = Math.max(1, Math.round(img.width*ratio));
+      const ch = Math.max(1, Math.round(img.height*ratio));
+      const c2 = document.createElement('canvas'); c2.width=cw; c2.height=ch;
+      const ctx2 = c2.getContext('2d'); ctx2.imageSmoothingEnabled = true; ctx2.imageSmoothingQuality='high';
+      ctx2.drawImage(img,0,0,cw,ch);
+      const out2 = c2.toDataURL('image/jpeg', 0.9);
+      const b64_2 = out2.split(',')[1]; const b2 = Math.ceil(b64_2.length*3/4);
+      return { base64:b64_2, bytes:b2, mime:'image/jpeg' };
+    }
+
+    // PNGかつ透過あり：透過を保持したまま縮小（品質パラメータなし）
+    let ratio = Math.max(0.1, Math.sqrt(maxBytes/bytes)*0.98);
+    let cw = Math.max(1, Math.round(img.width*ratio));
+    let ch = Math.max(1, Math.round(img.height*ratio));
+    for (let tries=0; tries<3; tries++){
+      const c = document.createElement('canvas'); c.width=cw; c.height=ch;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality='high';
+      ctx.drawImage(img,0,0,cw,ch);
+      const out = c.toDataURL('image/png');
+      const b64 = out.split(',')[1]; const b = Math.ceil(b64.length*3/4);
+      if (b <= maxBytes) return { base64:b64, bytes:b, mime:'image/png' };
+      // さらに少し縮小
+      cw = Math.max(1, Math.round(cw * 0.85));
+      ch = Math.max(1, Math.round(ch * 0.85));
+    }
+
+    // それでも超える場合のみ最終手段：JPEGに変換（透過は失われます）
+    {
+      const c = document.createElement('canvas'); c.width=cw; c.height=ch;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality='high';
+      ctx.drawImage(img,0,0,cw,ch);
+      const out = c.toDataURL('image/jpeg', 0.9);
+      const b64 = out.split(',')[1]; const b = Math.ceil(b64.length*3/4);
+      return { base64:b64, bytes:b, mime:'image/jpeg' };
+    }
+  }
 
   // 初期描画
   render();
 </script>
 </body>
 </html>
-
-
-
-
