@@ -21,7 +21,7 @@
   .btn-danger{background:var(--danger);color:#fff}
   .btn[disabled]{opacity:.6;cursor:not-allowed}
 
-  .btn-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0}
+  .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
   .btn-bar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
 
   .hint{font-size:14px;color:var(--muted);margin:6px 0}
@@ -82,12 +82,13 @@
         <div class="btn-row">
           <button type="button" class="btn btn-primary" id="pickBtn">📁 アルバムから写真を選択して送る</button>
           <button type="button" class="btn btn-primary" id="camBtn">📸 写真を撮影して送る</button>
-          <button type="button" class="btn" id="nativeCamBtn">📷 高画質（純正カメラ）</button>
         </div>
-        <div class="mini">※ 大きい画像は送信時に自動的に最適化します（PNGは透過保持）。</div>
+        <div class="mini">※ 画像が25MB超の場合、送信時に自動で最小限の最適化を行います（PNGは透過保持）。</div>
 
         <input id="pick" type="file" accept="image/jpeg,image/png,application/pdf" multiple style="display:none">
-        <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none">
+        <!-- フォールバック用（プログラムクリック互換のため非表示にしすぎない） -->
+        <input id="cameraFile" type="file" accept="image/*" capture="environment"
+               style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
 
         <div class="btn-bar">
           <button type="button" class="btn btn-danger" id="clearBtn">✖ すべて削除</button>
@@ -219,7 +220,6 @@
   /* ===== 各種UI操作 ===== */
   $('#pickBtn').onclick=()=>pickInput.click();
   $('#camBtn').onclick =()=>openCameraOrFallback();
-  $('#nativeCamBtn').onclick = ()=>cameraFile.click(); // 高画質（純正カメラ）
   $('#clearBtn').onclick=()=>{queue.length=0;render();};
 
   pickInput.addEventListener('change',e=>{ for(const f of e.target.files) queue.push(f); e.target.value=''; render(); });
@@ -239,7 +239,6 @@
         audio: false
       });
       camVideo.srcObject=camStream;
-      // 動画メタ読み込み完了を待つ（iOS対策）
       if (camVideo.readyState < 2) await new Promise(ok => camVideo.addEventListener('loadeddata', ok, {once:true}));
       camModal.classList.add('show');
       camModal.setAttribute('aria-hidden','false');
@@ -279,7 +278,7 @@
     }
   }
 
-  // ImageCapture優先スナップ（失敗時canvas）
+  // ImageCapture優先（失敗時canvas）
   async function camSnapBest() {
     const track = camStream?.getVideoTracks?.()[0];
     if (track && 'ImageCapture' in window) {
@@ -293,11 +292,11 @@
             settings.imageHeight = cap.imageHeight.max;
           }
         }
-        const blob = await ic.takePhoto(settings); // EXIF保持・高解像度に期待
+        const blob = await ic.takePhoto(settings); // 多くの環境でEXIF保持＆高解像度
         return blob;
       } catch (_) { /* fallback */ }
     }
-    // fallback: プレビュー解像度で静止画化
+    // fallback: プレビュー解像度→JPEG(品質1.0)
     const s = track?.getSettings?.() || {};
     const w = camVideo.videoWidth || s.width || 1280;
     const h = camVideo.videoHeight || s.height || 720;
@@ -311,8 +310,8 @@
   camShot.onclick=async ()=>{
     if(!camStream) return;
     try{
-      const blob = await camSnapBest(); // まず本物の静止画を狙う
-      await playShutter(); // 音を先に（体感よく）
+      const blob = await camSnapBest();
+      await playShutter();
 
       const d=new Date(), z=n=>String(n).padStart(2,'0');
       const name=`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}.jpg`;
@@ -364,7 +363,7 @@
     });
     document.querySelectorAll('.remove').forEach(b=>b.onclick=e=>{ queue.splice(Number(e.currentTarget.dataset.i),1); render(); });
 
-    // 非画像のみ、25MB超なら弾く（画像は送信時に最適化）
+    // 非画像のみ25MB超でブロック（画像は送信時に最小限最適化）
     const overs=queue.filter(f=>!(f.type||'').startsWith('image/') && f.size>MAX_BYTES);
     if(overs.length){
       precheck.className='msg msg-bad';
@@ -413,9 +412,9 @@
   /* ===== ユーティリティ ===== */
   function readFileAsDataURL(file){ return new Promise((ok,ng)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=ng; r.readAsDataURL(file); }); }
   function loadImage(url){ return new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=url; }); }
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&quot;',"'":'&#39;'}[c])); }
 
-  // 透過の有無をざっくり判定（高速サンプリング）
+  // 透過の有無を簡易判定
   async function hasAlphaChannel(img){
     const w = Math.min(img.width, 512), h = Math.min(img.height, 512);
     const c = document.createElement('canvas'); c.width=w; c.height=h;
@@ -443,9 +442,8 @@
     const isPng = /^image\/png$/i.test(file.type||'');
     const alpha = isPng ? await hasAlphaChannel(img) : false;
 
-    // JPEG系（またはアルファなし画像）はまず品質調整
+    // JPEG系 または アルファなし画像：まず品質だけ落とす（解像度維持）
     if (!isPng || !alpha){
-      // バイナリサーチで品質だけ落としてみる（解像度維持）
       let lo = 0.82, hi = 0.98, best = null;
       for (let i=0; i<6; i++){
         const q = (lo+hi)/2;
@@ -458,7 +456,7 @@
       }
       if (best) return best;
 
-      // まだ大きい → 必要分だけ縮小して 0.9 で再出力
+      // まだ大きい → 必要分だけ縮小して 0.9
       const ratio = Math.max(0.1, Math.sqrt(maxBytes/bytes)*0.96);
       const cw = Math.max(1, Math.round(img.width*ratio));
       const ch = Math.max(1, Math.round(img.height*ratio));
@@ -470,7 +468,7 @@
       return { base64:b64_2, bytes:b2, mime:'image/jpeg' };
     }
 
-    // PNGかつ透過あり：透過を保持したまま縮小（品質パラメータなし）
+    // PNGかつ透過あり：透過保持で縮小（品質指定なし）
     let ratio = Math.max(0.1, Math.sqrt(maxBytes/bytes)*0.98);
     let cw = Math.max(1, Math.round(img.width*ratio));
     let ch = Math.max(1, Math.round(img.height*ratio));
@@ -481,12 +479,11 @@
       const out = c.toDataURL('image/png');
       const b64 = out.split(',')[1]; const b = Math.ceil(b64.length*3/4);
       if (b <= maxBytes) return { base64:b64, bytes:b, mime:'image/png' };
-      // さらに少し縮小
       cw = Math.max(1, Math.round(cw * 0.85));
       ch = Math.max(1, Math.round(ch * 0.85));
     }
 
-    // それでも超える場合のみ最終手段：JPEGに変換（透過は失われます）
+    // 最終手段：JPEG化（透過は失われます）
     {
       const c = document.createElement('canvas'); c.width=cw; c.height=ch;
       const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality='high';
