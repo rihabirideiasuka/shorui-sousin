@@ -393,83 +393,30 @@
 
       const note = document.getElementById('note').value || '';
 
-// ====== ここから置き換え（安定版）======
-
-// ★最初は n8n 通知を止める（CORS原因を切り分け）
-const N8N_WEBHOOK = ''; // ←空にする
-
-async function postToGAS_(url, payload) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await res.text().catch(() => '');
-  if (!res.ok) throw new Error(`GAS_HTTP_${res.status}: ${text}`);
-
-  let json;
-  try { json = JSON.parse(text); } catch { throw new Error(`GAS_NOT_JSON: ${text}`); }
-  if (json.ok === false) throw new Error(`GAS_ERROR: ${json.error || 'unknown'}`);
-  return json;
-}
-
-async function postToN8N_(payload) {
-  if (!N8N_WEBHOOK) return;
-  const res = await fetch(N8N_WEBHOOK, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`N8N_HTTP_${res.status}: ${t}`);
-  }
-}
-
-// ★originが null になりうる（file://で開いた場合）ので、事前にチェック
-if (!location.origin || location.origin === 'null') {
-  throw new Error('このページを file:// で開いています。GitHub Pages から開いてください（origin=null でGASが拒否します）。');
-}
-
-const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
-
-const gasResultsAll = [];
-
-for (const f of queue) {
-  const packed = await packToLimit(f, MAX_BYTES);
-  const payload = {
-    note,
-    items: [{
-      name: (f.name || 'capture.jpg'),
-      mime: packed.mime,
-      base64: packed.base64
-    }]
-  };
-
-  const gasJson = await postToGAS_(url, payload);
-  gasResultsAll.push(gasJson);
-
-  const item = gasJson.items?.[0] || null;
-  const driveFileId = item?.id || null;
-  const isDup = item?.dup === true;
-
-  if (driveFileId && !isDup) {
-    // n8nは後でONにする
-    await postToN8N_({
-      note,
-      driveFileId,
-      uploadedName: item?.name || (f.name || 'capture.jpg'),
-      mime: packed.mime,
-      dup: false
-    });
-  }
-}
-
-console.log('ALL GAS RESULTS:', gasResultsAll);
-
-// ====== ここまで置き換え（安定版）======
-
+      for (const f of queue) {
+        try {
+          const packed = await packToLimit(f, MAX_BYTES);
+      
+          const payload = {
+            note,
+            items: [{
+              name: (f.name || 'capture.jpg'),
+              mime: packed.mime,
+              base64: packed.base64
+            }]
+          };
+      
+          const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
+      
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload),
+            mode: 'no-cors'
+          });
+      
+        } catch (_) {}
+      }
 
       sending.style.display='none';
       doneBox.classList.add('show');
@@ -568,4 +515,5 @@ console.log('ALL GAS RESULTS:', gasResultsAll);
 </script>
 </body>
 </html>
+
 
