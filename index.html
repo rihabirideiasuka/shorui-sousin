@@ -393,36 +393,27 @@
 
       const note = document.getElementById('note').value || '';
 
-// ====== ここから置き換え（完全版）======
+// ====== ここから置き換え（安定版）======
 
-// n8n にも通知したい場合だけ入れる（不要なら空文字のままでOK）
-const N8N_WEBHOOK = 'http://localhost:5678/webhook-test/upload-inbox'; 
-// 例：本番URLにするなら /webhook/ 版にする（テストは webhook-test）
+// ★最初は n8n 通知を止める（CORS原因を切り分け）
+const N8N_WEBHOOK = ''; // ←空にする
 
-// 1件ずつ送る（あなたの現状設計に合わせる）
-// 返り値: { ok, count, items:[{name,id,dup}] }
 async function postToGAS_(url, payload) {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, // ★text/plain はやめる
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    // mode は指定しない（same-origin/corsでOK）
   });
 
-  // Apps Script 側が落ちたり CORS NG のときにここで止まる
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`GAS_HTTP_${res.status}: ${t}`);
-  }
+  const text = await res.text().catch(() => '');
+  if (!res.ok) throw new Error(`GAS_HTTP_${res.status}: ${text}`);
 
-  // GAS 側が JSON を返す想定
-  const json = await res.json().catch(() => null);
-  if (!json) throw new Error('GAS_RESPONSE_NOT_JSON');
+  let json;
+  try { json = JSON.parse(text); } catch { throw new Error(`GAS_NOT_JSON: ${text}`); }
   if (json.ok === false) throw new Error(`GAS_ERROR: ${json.error || 'unknown'}`);
   return json;
 }
 
-// n8n へ送る（失敗してもアップロード自体は成功扱いにするなら try/catch で握る）
 async function postToN8N_(payload) {
   if (!N8N_WEBHOOK) return;
   const res = await fetch(N8N_WEBHOOK, {
@@ -436,60 +427,49 @@ async function postToN8N_(payload) {
   }
 }
 
+// ★originが null になりうる（file://で開いた場合）ので、事前にチェック
+if (!location.origin || location.origin === 'null') {
+  throw new Error('このページを file:// で開いています。GitHub Pages から開いてください（origin=null でGASが拒否します）。');
+}
+
 const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
 
-const gasResultsAll = []; // 画面表示やデバッグ用に溜める
+const gasResultsAll = [];
 
 for (const f of queue) {
-  try {
-    const packed = await packToLimit(f, MAX_BYTES);
+  const packed = await packToLimit(f, MAX_BYTES);
+  const payload = {
+    note,
+    items: [{
+      name: (f.name || 'capture.jpg'),
+      mime: packed.mime,
+      base64: packed.base64
+    }]
+  };
 
-    // GAS の想定 payload 形式に合わせる
-    const payload = {
+  const gasJson = await postToGAS_(url, payload);
+  gasResultsAll.push(gasJson);
+
+  const item = gasJson.items?.[0] || null;
+  const driveFileId = item?.id || null;
+  const isDup = item?.dup === true;
+
+  if (driveFileId && !isDup) {
+    // n8nは後でONにする
+    await postToN8N_({
       note,
-      items: [{
-        name: (f.name || 'capture.jpg'),
-        mime: packed.mime,
-        base64: packed.base64
-      }]
-    };
-
-    // ① GASへアップロード → JSONで fileId を受け取る
-    const gasJson = await postToGAS_(url, payload);
-    gasResultsAll.push(gasJson);
-
-    // ② GAS の返り値から fileId を抜く（dupならidはnullのはず）
-    const item = gasJson.items && gasJson.items[0] ? gasJson.items[0] : null;
-    const driveFileId = item && item.id ? item.id : null;
-    const isDup = item && item.dup === true;
-
-    // ③ n8n へ渡す（必要なら）
-    //    docType はあなたのWebhook側の設計次第なので、今は note/docType/fileId を送る形にしておく
-    if (driveFileId && !isDup) {
-      await postToN8N_({
-        residentName: note,              // ここは好きに設計変更OK（noteをそのまま入れてるだけ）
-        docType: (packed.mime || ''),    // 本来は「介護保険証」などを送るのが理想
-        note: note,
-        driveFileId: driveFileId,
-        uploadedName: item.name || (f.name || 'capture.jpg'),
-        mime: packed.mime,
-        bytes: packed.bytes || null,
-        dup: false
-      });
-    } else {
-      // 重複はn8nへ送らない（必要なら送ってもいい）
-    }
-
-  } catch (err) {
-    // 失敗時：ログに残して継続（今のあなたの設計に合わせて「握る」）
-    console.error('upload failed:', f?.name, err);
+      driveFileId,
+      uploadedName: item?.name || (f.name || 'capture.jpg'),
+      mime: packed.mime,
+      dup: false
+    });
   }
 }
 
-// デバッグ：全部の結果を見たいなら
 console.log('ALL GAS RESULTS:', gasResultsAll);
 
-// ====== ここまで置き換え（完全版）======
+// ====== ここまで置き換え（安定版）======
+
 
       sending.style.display='none';
       doneBox.classList.add('show');
