@@ -393,10 +393,10 @@
 
       const note = document.getElementById('note').value || '';
 
-      for (const f of queue) {
-        try {
-          const packed = await packToLimit(f, MAX_BYTES);
-      
+      // ===== ここから（画像のコード）=====
+      for (const f of queue){
+        try{
+          const packed  = await packToLimit(f, MAX_BYTES);
           const payload = {
             note,
             items: [{
@@ -405,18 +405,18 @@
               base64: packed.base64
             }]
           };
-      
+
           const url = API_ENDPOINT + '?origin=' + encodeURIComponent(location.origin);
-      
+
           await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify(payload),
             mode: 'no-cors'
           });
-      
-        } catch (_) {}
+        }catch(_){}
       }
+      // ===== ここまで =====
 
       sending.style.display='none';
       doneBox.classList.add('show');
@@ -515,5 +515,6 @@
 </script>
 </body>
 </html>
+
 
 
